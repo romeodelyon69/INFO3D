@@ -57,15 +57,21 @@ class Bone{
 
 class Skeleton{
     public:
+         //on preset une taille de 32 pour les vecteurs pour éviter de faire des reallocations
         std::vector<Bone> bones;
-        std::vector<Joint> joints;
-        
-        
+        std::vector<Joint*> joints;
+
+        Skeleton() {
+            // Initialize the bones and joints vectors with a size of 32
+            bones.reserve(32);
+            joints.reserve(32);
+        }
+       
         //a sphere to display the articulation
         cgp::mesh_drawable articulation;
         
         void addBone(Bone bone);
-        void addJoint(Joint& joint);
+        void addJoint(Joint* joint);
 
         virtual void initialize();
 
@@ -76,8 +82,9 @@ class Skeleton{
         //it will try to move the end of the first bone to the target position 
         //and will not move the start of the second
         void forwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f);
-        void applyConstraints(Bone* targetBone, Bone* fixedBone);
+        void forwardApplyConstraints(Bone* targetBone, Bone* fixedBone);
         void backwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f);
+        void backwardApplyConstraints(Bone* targetBone, Bone* fixedBone);
         
         void fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f, int max_iter = 10);
         void fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance = 0.01f, int max_iter = 10);
@@ -90,6 +97,7 @@ public:
     float scale;
     void initialize() override;
     void addJoint(std::string jointName, std::string boneFatherName, std::string boneChildName);
+    void addParentRotule(std::string jointName, std::string boneFatherName, std::string boneChildName, float maxAngle);
     HumanSkeleton() : scale(1.0f) {} // Constructeur par défaut avec une valeur par défaut pour scale
     HumanSkeleton(float scale) : scale(scale) {}
 

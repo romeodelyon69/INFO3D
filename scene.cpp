@@ -106,7 +106,7 @@ void scene_structure::display_frame()
 	//left hand = -1.327092 0.000000 2.011435
 
 	vec3 target = { -1.327092f + std::cos(timer.t) * 0.2 , 0.0f, 2.011435f - std::sin(timer.t) * 0.2};
-	//human.fabrik("left_hand", "left_shoulder", target, 0.01f, 10);
+	human.fabrik("left_hand", "left_shoulder", target, 0.01f, 10);
 	// Draw the human skeleton
 	human.draw(environment);
 	

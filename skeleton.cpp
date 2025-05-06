@@ -29,12 +29,7 @@ void Bone::draw(environment_structure& environment)
         return;
     }
     // Draw the bone
-    //this->bone.vbo_position.update(numarray<cgp::vec3>{start, end});
-
-    //c'est horrible de faire ca mais je ne comprends pas pourquoi la ligne au dessus ne fonctionne pas
-    //compile mais crash à l'execution
-    bone.clear();
-    bone.initialize_data_on_gpu({start,end});
+    this->bone.vbo_position.update(numarray<cgp::vec3>{start, end});
     cgp::draw(this->bone, environment);
 
 }
@@ -49,13 +44,15 @@ void Skeleton::initialize()
     for (auto& bone : bones) {
         bone.initialize();
     }
+
+
 }
 
 void Skeleton::addBone(Bone bone)
 {
     bones.push_back(bone);
 }
-void Skeleton::addJoint(Joint& joint)
+void Skeleton::addJoint(Joint* joint)
 {
     joints.push_back(joint);
 }
@@ -134,7 +131,7 @@ void Skeleton::backwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, fl
     //on appelle recursivement la fonction sur le parent
     backwardFabrik(targetBone->jointChild->boneChild, fixedBone, targetBone->end, tolerance);
 }
-void Skeleton::applyConstraints(Bone* targetBone, Bone* fixedBone)
+void Skeleton::forwardApplyConstraints(Bone* targetBone, Bone* fixedBone)
 {
     // Implementation of the FABRIK algorithm
     // This function recusively apply the constraints to the skeleton
@@ -152,7 +149,28 @@ void Skeleton::applyConstraints(Bone* targetBone, Bone* fixedBone)
     }
 
     //on appelle recursivement la fonction sur le parent
-    applyConstraints(targetBone->jointFather->boneFather, fixedBone);
+    forwardApplyConstraints(targetBone->jointFather->boneFather, fixedBone);
+}
+
+void Skeleton::backwardApplyConstraints(Bone* targetBone, Bone* fixedBone)
+{
+    // Implementation of the FABRIK algorithm
+    // This function recusively apply the constraints to the skeleton
+
+    //on procède de facon recursive jusqu'à ce que targetBone = fixedBone 
+    //dans ce cas on fait une dernière itération
+
+    //on va process targetBone
+    if (targetBone->jointChild != nullptr) {
+        targetBone->jointChild->applyConstraint(this);
+    }
+
+    if(targetBone->name == fixedBone->name) {
+        return;
+    }
+
+    //on appelle recursivement la fonction sur le parent
+    backwardApplyConstraints(targetBone->jointChild->boneChild, fixedBone);
 }
 
 void Skeleton::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance, int max_iter)
@@ -169,10 +187,11 @@ void Skeleton::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tole
         //forward FABRIK
         forwardFabrik(targetBone, fixedBone, target, tolerance);
         //constraint
-        applyConstraints(targetBone, fixedBone);
+        forwardApplyConstraints(targetBone, fixedBone);
         //backward FABRIK
         backwardFabrik(fixedBone, targetBone, fixedPoint, tolerance);
         //constraint
+        backwardApplyConstraints(fixedBone, targetBone);
         std::cout << "on passe là ? " << std::endl;
         
         //check if the target bone is close enough to the target
@@ -214,25 +233,46 @@ void HumanSkeleton::addJoint(std::string jointName, std::string boneFatherName, 
     Bone* boneChild = getBone(boneChildName);
 
     if (boneFather != nullptr && boneChild != nullptr) {
-        joints.emplace_back(jointName, boneFather, boneChild);
-        Joint& joint = joints.back();
+        // Create the joint
+        Joint* joint = new ParentRotule(jointName, boneFather, boneChild, 0.5f);
+        // Add the joint to the skeleton
+        joints.push_back(joint);
 
-        boneFather->jointChild = &joint;
-        boneChild->jointFather = &joint;
+        boneFather->jointChild = joint;
+        boneChild->jointFather = joint;
 
         std::cout << "Joint " << jointName << " added between " << boneFatherName << " and " << boneChildName << std::endl;
-        std::cout << "Joint name: " << joint.name << std::endl;
+        std::cout << "Joint name: " << joint->name << std::endl;
     } else {
         std::cerr << "Error: Joint not created, missing bones: "
                   << boneFatherName << " or " << boneChildName << std::endl;
     }
 }
 
+void HumanSkeleton::addParentRotule(std::string jointName, std::string boneFatherName, std::string boneChildName, float maxAngle) {
+    Bone* boneFather = getBone(boneFatherName);
+    Bone* boneChild = getBone(boneChildName);
+
+    if (boneFather != nullptr && boneChild != nullptr) {
+        // Create the joint
+        Joint* joint = new ParentRotule(jointName, boneFather, boneChild, maxAngle);
+        // Add the joint to the skeleton
+        joints.push_back(joint);
+
+        boneFather->jointChild = joint;
+        boneChild->jointFather = joint;
+
+        std::cout << "Joint " << jointName << " added between " << boneFatherName << " and " << boneChildName << std::endl;
+    } else {
+        std::cerr << "Error: Joint not created, missing bones: "
+                  << boneFatherName << " or " << boneChildName << std::endl;
+    }
+}
+
+
+
 void HumanSkeleton::initialize()
 {
-    //initialize the skeleton
-    Skeleton::initialize();
-
     //initialize the bones
     //head
     addBone(Bone("left_foot", scale * vec3{-FEETSPACING/2,0,0}, scale * vec3{-FEETSPACING/2-FOOT,0,0}));
@@ -281,14 +321,13 @@ void HumanSkeleton::initialize()
     //spine
     addJoint("Neck", "body", "neck");
     
-
     //arms
     addJoint("LeftShoulder", "left_shoulder", "left_upper_arm");
     addJoint("RightShoulder", "right_shoulder", "right_upper_arm");
     addJoint("LeftElbow", "left_upper_arm", "left_forearm");
     addJoint("RightElbow", "right_upper_arm", "right_forearm");
-    addJoint("LeftWrist", "left_forearm", "left_hand");
-    addJoint("RightWrist", "right_forearm", "right_hand");
+    addParentRotule("LeftWrist", "left_forearm", "left_hand", 0.5f);
+    addParentRotule("RightWrist", "right_forearm", "right_hand", 0.5f);
 
     //legs
     addJoint("LeftHip", "left_hip", "left_thigh");
@@ -298,23 +337,8 @@ void HumanSkeleton::initialize()
     addJoint("LeftAnkle", "left_tibia", "left_foot");
     addJoint("RightAnkle", "right_tibia", "right_foot");
 
+    //initialize the skeleton
+    Skeleton::initialize();
     std::cout << "Skeleton initialized" << std::endl;
-    Bone* leftHand = getBone("left_hand");
-  
-    std::cout << "RIGHT HIP" << getBone("right_hip")->start << "%%%%%%%%%%%" << std::endl;
-    cgp::vec3 target = { -1.327092f + std::cos(0.2f) * 0.2 , 0.9f, 2.011435f -  0.4};
-	fabrik("left_hand", "left_shoulder", target, 0.001f, 10);
-    std::cout << "giga chad" << std::endl;
-
-    target = {1,0.4,1};
-    std::cout << "RIGHT HIP" << getBone("right_hip")->start << "%%%%%%%%%%%" << std::endl;
-    fabrik("right_foot", "right_hip", target, 0.001f, 100);
-    std::cout << "RIGHT HIP" << getBone("right_hip")->start << "%%%%%%%%%%%" << std::endl;
-
-    std::cout << "nombre d'os = " << bones.size() << std::endl;
-    std::cout << "nombre d'articulations = " << joints.size() << std::endl;
-
-    //afichons les coordonées de la main gauche
-    std::cout << "left hand = " << leftHand->end << std::endl;
 
 }
