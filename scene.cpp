@@ -70,6 +70,9 @@ void scene_structure::initialize()
 	human.scale = 2.5f;
 	human.initialize();
 
+	targetSphere.initialize_data_on_gpu(mesh_primitive_sphere(0.1f));
+	targetSphere.material.color = { 1,0,0 };
+
 
 }
 
@@ -109,6 +112,12 @@ void scene_structure::display_frame()
 	human.fabrik("left_hand", "left_shoulder", target, 0.01f, 10);
 	// Draw the human skeleton
 	human.draw(environment);
+
+	// Draw the target
+	targetSphere.model.translation = target;
+	draw(targetSphere, environment);
+
+
 	
 
 	if (gui.display_wireframe) {

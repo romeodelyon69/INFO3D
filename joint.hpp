@@ -6,7 +6,7 @@
 
 using namespace cgp;
 
-class Skeleton;
+class HumanSkeleton;
 class Bone;
 
 class Joint{
@@ -16,7 +16,8 @@ class Joint{
         Bone *boneChild;
         //constructor
         Joint(std::string name, Bone* boneFather, Bone* boneChild);
-        virtual void applyConstraint(Skeleton *skeleton);
+        virtual void applyConstraintOnFather(HumanSkeleton *skeleton);
+        virtual void applyConstraintOnChild(HumanSkeleton *skeleton);
 };
 
 class GeneralRotule : public Joint{
@@ -28,7 +29,8 @@ class GeneralRotule : public Joint{
         GeneralRotule(std::string name, Bone* boneFather, Bone* boneChild, vec3 axis, float maxAngle);
 
         void set(vec3 axis, float maxAngle);
-        void applyConstraint(Skeleton *skeleton) override;
+        virtual void applyConstraintOnFather(HumanSkeleton *skeleton) override;
+        virtual void applyConstraintOnChild(HumanSkeleton *skeleton) override;
 };
 
 class ParentRotule : public GeneralRotule {
@@ -38,5 +40,7 @@ class ParentRotule : public GeneralRotule {
         
         void setAngle(float maxAngle);
         void update();
+        void applyConstraintOnFather(HumanSkeleton *skeleton) override;
+        void applyConstraintOnChild(HumanSkeleton *skeleton) override;
 };
 

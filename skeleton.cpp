@@ -1,4 +1,5 @@
 #include "skeleton.hpp"
+#include "Nmath.hpp"
 
 using namespace cgp;
 
@@ -23,6 +24,12 @@ void Bone::setStart(cgp::vec3 start)
     direction = (end - start) / length;
 }
 
+void Bone::translate(cgp::vec3 translation)
+{
+    this->start += translation;
+    this->end += translation;
+}
+
 void Bone::draw(environment_structure& environment)
 {   
     if (cgp::norm(end - start) < 0.01f) {
@@ -36,7 +43,7 @@ void Bone::draw(environment_structure& environment)
 
 
 
-void Skeleton::initialize()
+void KinematicChain::initialize()
 {
     articulation.initialize_data_on_gpu(cgp::mesh_primitive_sphere(0.05f));
     articulation.material.color = cgp::vec3(0.5f,0.5f,0.5f);
@@ -48,16 +55,16 @@ void Skeleton::initialize()
 
 }
 
-void Skeleton::addBone(Bone bone)
+void KinematicChain::addBone(Bone bone)
 {
     bones.push_back(bone);
 }
-void Skeleton::addJoint(Joint* joint)
+void KinematicChain::addJoint(Joint* joint)
 {
     joints.push_back(joint);
 }
 
-Bone* Skeleton::getBone(std::string name)
+Bone* KinematicChain::getBone(std::string name)
 {
     for (auto& bone : bones) {
         if (bone.name == name) {
@@ -67,7 +74,7 @@ Bone* Skeleton::getBone(std::string name)
     return nullptr;
 }
 
-void Skeleton::draw(environment_structure& environment)
+void KinematicChain::draw(environment_structure& environment)
 {
     // Draw the bones and articulations
     for (auto& bone : bones) {
@@ -79,129 +86,132 @@ void Skeleton::draw(environment_structure& environment)
     }
 }
 
-void Skeleton::forwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance)
+void KinematicChain::forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
 {
     // Implementation of the FABRIK algorithm
     // This function will take to bones, the target position and the tolerance
     // It will try to move the end of the first bone to the target position 
     // and will not move the start of the second
 
-    //on procède de facon recursive jusqu'à ce que targetBone = fixedBone 
-    //dans ce cas on fait une dernière itération
+    //on procède de facon itérative en parcourant bonesOrder
     
-    //on va process targetBone
-    float length = targetBone->length;
-    std::cout << "length avant update = " << length << std::endl;
-    targetBone->setEnd(target);
-   
-    vec3 tragetStart = targetBone->end - targetBone->direction * length;
-    targetBone->setStart(tragetStart);
-    std::cout << "length après update = " << targetBone->length << std::endl;
-    
-    std::cout << "end = " << targetBone->end << std::endl;
-    std::cout << "start = " << targetBone->start << std::endl;
-    if(targetBone->name == fixedBone->name) {
-        return;
+    for (auto& bone : bonesOrder) {
+        float length = bone->length;
+        bone->setEnd(target);
+        vec3 tragetStart = bone->end - bone->direction * length;
+        bone->setStart(tragetStart);
+        target = bone->start;
     }
-    
-    //on appelle recursivement la fonction sur le parent
-    forwardFabrik(targetBone->jointFather->boneFather, fixedBone, targetBone->start, tolerance);
 }
+    
 
-void Skeleton::backwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance)
+void KinematicChain::backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
 {
     // Implementation of the FABRIK algorithm
     // This function will take to bones, the target position and the tolerance
     // It will try to move the end of the first bone to the target position 
     // and will not move the start of the second
 
-    //on procède de facon recursive jusqu'à ce que targetBone = fixedBone 
-    //dans ce cas on fait une dernière itération
+    ////on procède de facon itérative en parcourant bonesOrder à l'envers
 
     
-    //on va process targetBone
-    float length = targetBone->length;
-    targetBone->setStart(target);
-    vec3 tragetEnd = targetBone->start + targetBone->direction * length;
-    targetBone->setEnd(tragetEnd);
-    if(targetBone->name == fixedBone->name) {
-
-        return;
+    for (auto it = bonesOrder.rbegin(); it != bonesOrder.rend(); ++it) {
+        Bone* bone = *it;
+        float length = bone->length;
+        bone->setStart(target);
+        vec3 targetEnd = bone->start + bone->direction * length;
+        bone->setEnd(targetEnd);
+        target = bone->end;
     }
-    //on appelle recursivement la fonction sur le parent
-    backwardFabrik(targetBone->jointChild->boneChild, fixedBone, targetBone->end, tolerance);
 }
-void Skeleton::forwardApplyConstraints(Bone* targetBone, Bone* fixedBone)
+void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
 {
     // Implementation of the FABRIK algorithm
-    // This function recusively apply the constraints to the skeleton
+    // This function recusively apply the constraints to the KinematicChain
 
-    //on procède de facon recursive jusqu'à ce que targetBone = fixedBone 
-    //dans ce cas on fait une dernière itération
+    //on procède de facon itérative en parcourant bonesOrder en évitant le dernier os qui n'a pas de joint parent
 
-    //on va process targetBone
-    if (targetBone->jointFather != nullptr) {
-        targetBone->jointFather->applyConstraint(this);
+    for (auto& bone : bonesOrder) {
+        if (bone->jointFather != nullptr) {
+            bone->jointFather->applyConstraintOnFather(skeleton);
+        }
     }
-
-    if(targetBone->name == fixedBone->name) {
-        return;
-    }
-
-    //on appelle recursivement la fonction sur le parent
-    forwardApplyConstraints(targetBone->jointFather->boneFather, fixedBone);
 }
 
-void Skeleton::backwardApplyConstraints(Bone* targetBone, Bone* fixedBone)
+void KinematicChain::backwardApplyConstraints(std::vector<Bone*> bonesOrder)
 {
     // Implementation of the FABRIK algorithm
-    // This function recusively apply the constraints to the skeleton
+    // This function recusively apply the constraints to the KinematicChain
 
-    //on procède de facon recursive jusqu'à ce que targetBone = fixedBone 
-    //dans ce cas on fait une dernière itération
+    //on procède de facon itérative en parcourant bonesOrder à l'envers
 
-    //on va process targetBone
-    if (targetBone->jointChild != nullptr) {
-        targetBone->jointChild->applyConstraint(this);
+    for (auto it = bonesOrder.rbegin(); it != bonesOrder.rend(); ++it) {
+        Bone* bone = *it;
+        if (bone->jointFather != nullptr) {
+            bone->jointFather->applyConstraintOnChild(skeleton);
+        }
     }
+    Bone* left_hand = getBone("left_hand");
+    Bone* left_forearm = getBone("left_forearm");
 
-    if(targetBone->name == fixedBone->name) {
-        return;
-    }
+    //calculons l'angle entre left_hand et left_forearm
+    float angle = angleBetween(left_hand->direction, left_forearm->direction);
+    
 
-    //on appelle recursivement la fonction sur le parent
-    backwardApplyConstraints(targetBone->jointChild->boneChild, fixedBone);
+    //std::cout << "#########################################################################" << std::endl;
+    //std::cout << "Angle between left_hand and left_forearm: " << angle << std::endl;
 }
 
-void Skeleton::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance, int max_iter)
+void KinematicChain::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance, int max_iter)
 {
     // Implementation of the FABRIK algorithm
     // This function will take to bones, the target position and the tolerance
     // It will try to move the end of the first bone to the target position 
     // and will not move the start of the second
+
+    //on va construire un vecteur de pointeur sur les bones pour les parcourir à l'endroit puis à l'envers
+
+    
+    std::vector<Bone*> bonesOrder;
+    Bone* currentBone = targetBone;
+    bonesOrder.push_back(currentBone);
+    //on remonte l'arbre jusqu'à targetBone
+    while (currentBone != nullptr && currentBone->name != fixedBone->name) {
+        currentBone = currentBone->jointFather->boneFather;
+        bonesOrder.push_back(currentBone);
+    }
+    
 
     cgp::vec3 fixedPoint = fixedBone->start;
     for (int i = 0; i < max_iter; i++) {
-        std::cout << "Iteration " << i << std::endl;
-        std::cout << "target = " << target << std::endl;
+    
         //forward FABRIK
-        forwardFabrik(targetBone, fixedBone, target, tolerance);
+        forwardFabrik(bonesOrder, target, tolerance);
         //constraint
-        forwardApplyConstraints(targetBone, fixedBone);
+        forwardApplyConstraints(bonesOrder);
         //backward FABRIK
-        backwardFabrik(fixedBone, targetBone, fixedPoint, tolerance);
+        backwardFabrik(bonesOrder, fixedPoint, tolerance);
         //constraint
-        backwardApplyConstraints(fixedBone, targetBone);
-        std::cout << "on passe là ? " << std::endl;
+        backwardApplyConstraints(bonesOrder);
+        
         
         //check if the target bone is close enough to the target
         if (cgp::norm(targetBone->end - target) < tolerance) {
             break;
         }
     }
+
+    //std::cout << "FABRIK finished" << std::endl;
+    //we are going to verify that the constraint for the hand is respected
+    Bone* left_hand = getBone("left_hand");
+    Bone* left_forearm = getBone("left_forearm");
+
+    //calculons l'angle entre left_hand et left_forearm
+    float angle = angleBetween(left_hand->direction, left_forearm->direction);
+    //std::cout << "Angle between left_hand and left_forearm: " << angle << std::endl;
 }
 
-void Skeleton::fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance, int max_iter)
+void KinematicChain::fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance, int max_iter)
 {
     //implementation that use bone names instead of pointers, easier to use
     // Implementation of the FABRIK algorithm
@@ -234,7 +244,7 @@ void HumanSkeleton::addJoint(std::string jointName, std::string boneFatherName, 
 
     if (boneFather != nullptr && boneChild != nullptr) {
         // Create the joint
-        Joint* joint = new ParentRotule(jointName, boneFather, boneChild, 0.5f);
+        Joint* joint = new Joint(jointName, boneFather, boneChild);
         // Add the joint to the skeleton
         joints.push_back(joint);
 
@@ -322,7 +332,7 @@ void HumanSkeleton::initialize()
     addJoint("Neck", "body", "neck");
     
     //arms
-    addJoint("LeftShoulder", "left_shoulder", "left_upper_arm");
+    addParentRotule("LeftShoulder", "left_shoulder", "left_upper_arm", 0.5f);
     addJoint("RightShoulder", "right_shoulder", "right_upper_arm");
     addJoint("LeftElbow", "left_upper_arm", "left_forearm");
     addJoint("RightElbow", "right_upper_arm", "right_forearm");
@@ -338,7 +348,7 @@ void HumanSkeleton::initialize()
     addJoint("RightAnkle", "right_tibia", "right_foot");
 
     //initialize the skeleton
-    Skeleton::initialize();
+    KinematicChain::initialize();
     std::cout << "Skeleton initialized" << std::endl;
 
 }

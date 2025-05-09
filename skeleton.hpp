@@ -25,6 +25,7 @@
 
 
 class Joint;
+class HumanSkeleton;
 
 class Bone{
     public:
@@ -38,6 +39,7 @@ class Bone{
         Bone(std::string name, cgp::vec3 start, cgp::vec3 end): name(name), start(start), end(end){
             direction = end - start;
             length = cgp::norm(direction);
+            direction = (end - start) / length;
         };
         cgp::curve_drawable bone;
 
@@ -51,17 +53,20 @@ class Bone{
 
         void setStart(cgp::vec3 start);
         void setEnd(cgp::vec3 end);
+        void translate(cgp::vec3 translation);
 
         
 };
 
-class Skeleton{
+class KinematicChain{
     public:
          //on preset une taille de 32 pour les vecteurs pour éviter de faire des reallocations
         std::vector<Bone> bones;
         std::vector<Joint*> joints;
 
-        Skeleton() {
+        HumanSkeleton *skeleton = nullptr;
+
+        KinematicChain() {
             // Initialize the bones and joints vectors with a size of 32
             bones.reserve(32);
             joints.reserve(32);
@@ -77,22 +82,25 @@ class Skeleton{
 
         void draw(environment_structure& environment);
 
-        // Apply the FABRIK algorithm to the skeleton
+        // Apply the FABRIK algorithm to the KinematicChain
         // the function will take to bones, the target position and the tolerance
         //it will try to move the end of the first bone to the target position 
         //and will not move the start of the second
-        void forwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f);
-        void forwardApplyConstraints(Bone* targetBone, Bone* fixedBone);
-        void backwardFabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f);
-        void backwardApplyConstraints(Bone* targetBone, Bone* fixedBone);
+        void forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
+        void forwardApplyConstraints(std::vector<Bone*> bonesOrder);
+        void backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
+        void backwardApplyConstraints(std::vector<Bone*> bonesOrder);
         
+        //à implémenter : 
+        //void fabrik(vec3 target, float tolerance = 0.01f, int max_iter = 10);
+        //void fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f, int max_iter = 10);
         void fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f, int max_iter = 10);
         void fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance = 0.01f, int max_iter = 10);
         
         Bone* getBone(std::string name);
 };
 
-class HumanSkeleton : public Skeleton {
+class HumanSkeleton : public KinematicChain {
 public:
     float scale;
     void initialize() override;

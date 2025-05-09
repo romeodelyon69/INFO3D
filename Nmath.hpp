@@ -1,9 +1,11 @@
+#pragma once
+
 #include "cgp/cgp.hpp"
 
-float angleBetweenSigned(vec3 a, vec3 b, vec3 ref_axis) {
-    vec3 a_n = cgp::normalize(a);
-    vec3 b_n = cgp::normalize(b);
-    float angle = std::acos(clamp(dot(a_n, b_n), -1.0f, 1.0f));
+inline float angleBetweenSigned(cgp::vec3 a, cgp::vec3 b, cgp::vec3 ref_axis) {
+    cgp::vec3 a_n = cgp::normalize(a);
+    cgp::vec3 b_n = cgp::normalize(b);
+    float angle = std::acos(cgp::clamp(dot(a_n, b_n), -1.0f, 1.0f));
 
     // Déterminer le signe via le produit vectoriel projeté sur ref_axis
     float sign = dot(cross(a_n, b_n), ref_axis);
@@ -13,8 +15,8 @@ float angleBetweenSigned(vec3 a, vec3 b, vec3 ref_axis) {
     return angle; // Angle en radians entre -π et π
 }
 
-float angleBetween(vec3 a, vec3 b) {
-    vec3 a_n = cgp::normalize(a);
-    vec3 b_n = cgp::normalize(b);
-    return std::acos(clamp(dot(a_n, b_n), -1.0f, 1.0f)); // Angle en radians
+inline float angleBetween(cgp::vec3 a, cgp::vec3 b) {
+    cgp::vec3 a_n = cgp::normalize(a);
+    cgp::vec3 b_n = cgp::normalize(b);
+    return std::acos(cgp::clamp(dot(a_n, b_n), -1.0f, 1.0f)); // Angle en radians
 }

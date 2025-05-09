@@ -46,6 +46,7 @@ struct scene_structure : cgp::scene_inputs_generic {
 	mesh_drawable cube2;
 
 	HumanSkeleton human = HumanSkeleton();
+	mesh_drawable targetSphere;
 
 
 	// ****************************** //
