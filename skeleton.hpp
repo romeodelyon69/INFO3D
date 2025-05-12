@@ -72,6 +72,7 @@ class KinematicChain{
         }
 
         cgp::vec3 position; //the position of the kinematic chain in the world
+        cgp::vec3 endEffectorPos;
 
         HumanSkeleton *skeleton = nullptr;
         
@@ -109,7 +110,7 @@ class KinematicChain{
         void backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
         void backwardApplyConstraints(std::vector<Bone*> bonesOrder);
     
-        cgp::vec3 endEffectorPos;
+        
 };
 
 class Arm : public KinematicChain{
@@ -118,6 +119,7 @@ class Arm : public KinematicChain{
         void initialize() override;
 
         cgp::vec3 getShoulderPos();
+        void moveFromHandToShoulder(cgp::vec3 handTarget);
 };
 
 class Leg : public KinematicChain{
@@ -126,6 +128,7 @@ class Leg : public KinematicChain{
         void initialize() override;
 
         cgp::vec3 getHipPos();
+        void moveFromFootToHip(cgp::vec3 footTarget);
 };
 
 class IsoceleTriangle{
@@ -167,5 +170,6 @@ class HumanSkeleton {
 
         void translate(cgp::vec3 translation);
         void movePelvis(cgp::vec3 translation);
-        void moveLegs(cgp::vec3 leftFootMove, cgp::vec3 rightFootMove);
+        void setPelvisPos(cgp::vec3 position);
+        void setPosLegs(cgp::vec3 leftFootPos, cgp::vec3 rightFootPos);
 };

@@ -83,15 +83,15 @@ void GeneralRotule::applyConstraintOnFather(HumanSkeleton *skeleton)
        //rotate the child bone aroud the cross product of the child vector and the axis
         vec3 rotationAxis = normalize(cross(boneChild->direction, axis));
         //rotate the father bone
-        std::cout << "ancienne longueuer " << boneFather->length << std::endl;
+        //std::cout << "ancienne longueuer " << boneFather->length << std::endl;
         float angleToRotate = maxAngle - angle;
         mat3 rotationMatrix = mat3::build_rotation_from_axis_angle(rotationAxis, angleToRotate);
         vec3 newFatherVector = boneFather->length * rotationMatrix * boneFather->direction;
-        std::cout << "bone father direction norme " << cgp::norm(boneFather->direction) << std::endl;
-        std::cout << "newFatherVector norme " << cgp::norm(newFatherVector) << std::endl;
+        //std::cout << "bone father direction norme " << cgp::norm(boneFather->direction) << std::endl;
+        //std::cout << "newFatherVector norme " << cgp::norm(newFatherVector) << std::endl;
         
         boneFather->setStart(boneFather->end - newFatherVector);
-        std::cout << "nouvelle longueur" << boneFather->length << std::endl;
+        //std::cout << "nouvelle longueur" << boneFather->length << std::endl;
         //std::cout<<"le nouvel angle vaut : "<<angleBetween(newChildVector, axis) << std::endl;
     }
 }

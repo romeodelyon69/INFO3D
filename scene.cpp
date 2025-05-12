@@ -113,7 +113,7 @@ void scene_structure::display_frame()
 	//left hand = -1.327092 0.000000 2.011435
 
 	vec3 target = { -1.327092f + std::cos(timer.t) * 0.2 , 0.0f, 2.011435f - std::sin(timer.t) * 0.2};
-	vec3 translationY = {0, std::cos(timer.t) * 0.9, 0};
+	vec3 translationY = {0, std::cos(timer.t) * 0.01, 0};
 
 	vec3 leftFootTarget = {-FEETSPACING, 0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
 	vec3 rightFootTarget = {FEETSPACING, -0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
@@ -125,7 +125,8 @@ void scene_structure::display_frame()
 	arm.draw(environment);
 	*/
 
-	human.moveLegs(leftFootTarget, rightFootTarget);
+	//human.moveLegs(leftFootTarget, rightFootTarget);
+	human.movePelvis(translationY);
 	human.draw(environment);
 
 	// Draw the target

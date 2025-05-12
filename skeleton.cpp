@@ -51,6 +51,7 @@ void KinematicChain::initialize()
         std::cout << "Initializing bone " << bone->name << std::endl;
         bone->initialize();
     }
+    endEffectorPos = bones.back()->end;
 }
 
 void KinematicChain::addBone(Bone* bone)
@@ -152,7 +153,7 @@ void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
 }
 
 void KinematicChain::fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance, int max_iter){
-    std::cout << "coucou" << std::endl;
+    //std::cout << "coucou" << std::endl;
     //fixedpoint est start du dernier os
     cgp::vec3 fixedPoint = bonesOrder.back()->start;
     for (int i = 0; i < max_iter; i++) {
@@ -237,10 +238,10 @@ void KinematicChain::setStartEffector(cgp::vec3 target)
 {
     //on translate la chaine cinématique pour que le point de départ soit à la position cible 
     //puis on applique Fabrik pour remettre la fin de la chaine à sa position initiale
-
     cgp::vec3 translation = target - position;
     translate(translation);
     moveEndEffector(-translation);
+    std::cout<<"end effector position" << endEffectorPos << std::endl;
 }
 
 Arm::Arm(float scale, bool isLeft)
@@ -291,6 +292,12 @@ cgp::vec3 Arm::getShoulderPos()
     return getBone("bicep")->start;
 }
 
+void Arm::moveFromHandToShoulder(cgp::vec3 handTarget)
+{
+    //on va déplacer la main à la position cible
+    fabrik("hand", "bicep", handTarget - position);
+}
+
 Leg::Leg(float scale, bool isLeft)
 {
     if (isLeft) {
@@ -309,7 +316,7 @@ Leg::Leg(float scale, bool isLeft)
     Bone* foot = new Bone("foot", anklePos, footPos);
 
     // Initialize the joints
-    Joint* hip = new Joint("hip", pelvis, thigh);
+    Joint* hip = new ParentRotule("hip", pelvis, thigh, 0.5f);
     Joint* knee = new ParentRotule("knee", thigh, calf, 1.5f);
     Joint* ankle = new ParentRotule("ankle", calf, foot, 1.7f);
 
@@ -336,6 +343,12 @@ void Leg::initialize()
 cgp::vec3 Leg::getHipPos()
 {
     return getBone("thigh")->start;
+}
+
+void Leg::moveFromFootToHip(cgp::vec3 footTarget)
+{
+    //on va déplacer le pied à la position cible
+    fabrik("foot", "thigh", footTarget - position);
 }
 
 void IsoceleTriangle::moveAandB(cgp::vec3 newA, cgp::vec3 newB)
@@ -421,11 +434,29 @@ void HumanSkeleton::translate(cgp::vec3 translation)
     rightLeg.translate(translation);
 }
 
-
-void HumanSkeleton::moveLegs(cgp::vec3 leftFootMove, cgp::vec3 rightFootMove)
+void HumanSkeleton::movePelvis(cgp::vec3 translation)
 {
-    leftLeg.setEndEffectorWorldPos(leftFootMove);
-    rightLeg.setEndEffectorWorldPos(rightFootMove);
-    //update the pelvis position
-    
+    //move the pelvis and the legs
+    setPelvisPos(position + translation);
+}
+void HumanSkeleton::setPelvisPos(cgp::vec3 position)
+{
+    //set the pelvis position and move the legs
+    this->position = position;
+    leftArm.setStartEffector(position);
+    rightArm.setStartEffector(position);
+    leftLeg.setStartEffector(position);
+    rightLeg.setStartEffector(position);
+}
+
+void HumanSkeleton::setPosLegs(cgp::vec3 leftFootPos, cgp::vec3 rightFootPos)
+{
+    //move legs : 
+    leftLeg.setEndEffectorWorldPos(leftFootPos);
+    rightLeg.setEndEffectorWorldPos(rightFootPos);
+    //update pelvis 
+    pelvis.moveAandB(leftLeg.getHipPos(), rightLeg.getHipPos());
+    torso.setC(pelvis.positionRef);
+
+    setPelvisPos(pelvis.positionRef);
 }
