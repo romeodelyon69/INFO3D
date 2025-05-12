@@ -67,11 +67,15 @@ void scene_structure::initialize()
 
 	cube2 = cube1;
 
-	human.scale = 2.5f;
-	human.initialize();
-
 	targetSphere.initialize_data_on_gpu(mesh_primitive_sphere(0.1f));
 	targetSphere.material.color = { 1,0,0 };
+
+	// Initialize the arm
+	arm.initialize();
+	human.initialize();
+
+	std::cout << "arm origin = " << human.leftArm.position << std::endl;
+	std::cout << "leg origin = " << human.leftLeg.position << std::endl;
 
 
 }
@@ -109,16 +113,24 @@ void scene_structure::display_frame()
 	//left hand = -1.327092 0.000000 2.011435
 
 	vec3 target = { -1.327092f + std::cos(timer.t) * 0.2 , 0.0f, 2.011435f - std::sin(timer.t) * 0.2};
-	human.fabrik("left_hand", "left_shoulder", target, 0.01f, 10);
+	vec3 translationY = {0, std::cos(timer.t) * 0.9, 0};
+
+	vec3 leftFootTarget = {-FEETSPACING, 0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
+	vec3 rightFootTarget = {FEETSPACING, -0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
+
+	/*
+	arm.setEndEffectorWorldPos(target);
+	arm.setStartEffector(translationY);
 	// Draw the human skeleton
+	arm.draw(environment);
+	*/
+
+	human.moveLegs(leftFootTarget, rightFootTarget);
 	human.draw(environment);
 
 	// Draw the target
 	targetSphere.model.translation = target;
 	draw(targetSphere, environment);
-
-
-	
 
 	if (gui.display_wireframe) {
 		draw_wireframe(terrain, environment);
@@ -127,14 +139,12 @@ void scene_structure::display_frame()
 		draw_wireframe(cube1, environment);
 		draw_wireframe(cube2, environment);
 	}
-	
 }
 
 void scene_structure::display_gui()
 {
 	ImGui::Checkbox("Frame", &gui.display_frame);
 	ImGui::Checkbox("Wireframe", &gui.display_wireframe);
-
 }
 
 void scene_structure::mouse_move_event()

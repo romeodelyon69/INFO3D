@@ -45,7 +45,7 @@ class Bone{
 
         void initialize();
 
-        void draw(environment_structure& environment);
+        void draw(environment_structure& environment, cgp::vec3 poseReference = cgp::vec3(0,0,0));
         
         //pour le moment chaque os n'a qu'un seul parent direct et qu'un seul enfant direct
         Joint *jointFather = nullptr;
@@ -60,28 +60,46 @@ class Bone{
 
 class KinematicChain{
     public:
-         //on preset une taille de 32 pour les vecteurs pour éviter de faire des reallocations
-        std::vector<Bone> bones;
+         
+        std::vector<Bone*> bones;
         std::vector<Joint*> joints;
 
-        HumanSkeleton *skeleton = nullptr;
-
         KinematicChain() {
-            // Initialize the bones and joints vectors with a size of 32
-            bones.reserve(32);
-            joints.reserve(32);
+            //on preset une taille de 32 pour les vecteurs pour éviter de faire des reallocations
+            // Initialize the bones and joints vectors with a size of 128
+            bones.reserve(128);
+            joints.reserve(128);
         }
-       
+
+        cgp::vec3 position; //the position of the kinematic chain in the world
+
+        HumanSkeleton *skeleton = nullptr;
+        
         //a sphere to display the articulation
         cgp::mesh_drawable articulation;
         
-        void addBone(Bone bone);
+        void addBone(Bone* bone);
         void addJoint(Joint* joint);
 
         virtual void initialize();
 
         void draw(environment_structure& environment);
 
+        void translate(cgp::vec3 translation);
+
+        void setEndEffectorWorldPos(cgp::vec3 target);
+        void setEndEffectorRelativePos(cgp::vec3 target);
+        void moveEndEffector(cgp::vec3 move);
+        void setStartEffector(cgp::vec3 target); 
+        
+        Bone* getBone(std::string name);
+        
+        void fabrik(vec3 target, float tolerance = 0.01f, int max_iter = 50);
+        void fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f, int max_iter = 50);
+        void fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f, int max_iter = 50);
+        void fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance = 0.01f, int max_iter = 50);
+
+    private:
         // Apply the FABRIK algorithm to the KinematicChain
         // the function will take to bones, the target position and the tolerance
         //it will try to move the end of the first bone to the target position 
@@ -90,23 +108,64 @@ class KinematicChain{
         void forwardApplyConstraints(std::vector<Bone*> bonesOrder);
         void backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
         void backwardApplyConstraints(std::vector<Bone*> bonesOrder);
-        
-        //à implémenter : 
-        //void fabrik(vec3 target, float tolerance = 0.01f, int max_iter = 10);
-        //void fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f, int max_iter = 10);
-        void fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance = 0.01f, int max_iter = 10);
-        void fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance = 0.01f, int max_iter = 10);
-        
-        Bone* getBone(std::string name);
+    
+        cgp::vec3 endEffectorPos;
 };
 
-class HumanSkeleton : public KinematicChain {
-public:
-    float scale;
-    void initialize() override;
-    void addJoint(std::string jointName, std::string boneFatherName, std::string boneChildName);
-    void addParentRotule(std::string jointName, std::string boneFatherName, std::string boneChildName, float maxAngle);
-    HumanSkeleton() : scale(1.0f) {} // Constructeur par défaut avec une valeur par défaut pour scale
-    HumanSkeleton(float scale) : scale(scale) {}
+class Arm : public KinematicChain{
+    public:
+        Arm(float scale = 1.0f, bool isLeft = false);
+        void initialize() override;
 
+        cgp::vec3 getShoulderPos();
+};
+
+class Leg : public KinematicChain{
+    public:
+        Leg(float scale = 1.0f, bool isLeft = false);
+        void initialize() override;
+
+        cgp::vec3 getHipPos();
+};
+
+class IsoceleTriangle{
+    public:
+        cgp::vec3 a;
+        cgp::vec3 b;
+        cgp::vec3 c;
+        cgp::vec3 normal;
+        float height; //height of the triangle
+        cgp::vec3 positionRef; //technically this is the position of C in the real world
+
+        IsoceleTriangle(cgp::vec3 a, cgp::vec3 b, cgp::vec3 c): a(a), b(b), c(c){
+            normal = cgp::cross(b - a, c - a);
+            normal = normal / cgp::norm(normal);
+            height = cgp::norm(c - (a+b)/2);
+        }
+
+        void moveAandB(cgp::vec3 newA, cgp::vec3 newB);
+        void moveC(cgp::vec3 newC);
+        void setC(cgp::vec3 newC);
+};
+
+class HumanSkeleton {
+    float scale;
+    public:
+        Arm leftArm;
+        Arm rightArm;
+        Leg leftLeg;
+        Leg rightLeg;
+        IsoceleTriangle torso;
+        IsoceleTriangle pelvis;
+
+        cgp::vec3 position;
+
+        HumanSkeleton(float scale = 1.0f, cgp::vec3 position = cgp::vec3(0,0,0));
+
+        void initialize();
+        void draw(environment_structure& environment);
+
+        void translate(cgp::vec3 translation);
+        void movePelvis(cgp::vec3 translation);
+        void moveLegs(cgp::vec3 leftFootMove, cgp::vec3 rightFootMove);
 };

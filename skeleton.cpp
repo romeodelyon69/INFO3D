@@ -1,5 +1,6 @@
 #include "skeleton.hpp"
 #include "Nmath.hpp"
+#include <cmath>
 
 using namespace cgp;
 
@@ -30,32 +31,29 @@ void Bone::translate(cgp::vec3 translation)
     this->end += translation;
 }
 
-void Bone::draw(environment_structure& environment)
+void Bone::draw(environment_structure& environment, cgp::vec3 poseReference)
 {   
     if (cgp::norm(end - start) < 0.01f) {
         return;
     }
     // Draw the bone
-    this->bone.vbo_position.update(numarray<cgp::vec3>{start, end});
+    this->bone.vbo_position.update(numarray<cgp::vec3>{start + poseReference, end + poseReference});
     cgp::draw(this->bone, environment);
-
 }
-
-
 
 void KinematicChain::initialize()
 {
     articulation.initialize_data_on_gpu(cgp::mesh_primitive_sphere(0.05f));
     articulation.material.color = cgp::vec3(0.5f,0.5f,0.5f);
-
+    std::cout << "Initializing the kinematic chain" << std::endl;
     for (auto& bone : bones) {
-        bone.initialize();
+        std::cout << "Initializing bone " << std::endl;
+        std::cout << "Initializing bone " << bone->name << std::endl;
+        bone->initialize();
     }
-
-
 }
 
-void KinematicChain::addBone(Bone bone)
+void KinematicChain::addBone(Bone* bone)
 {
     bones.push_back(bone);
 }
@@ -66,9 +64,9 @@ void KinematicChain::addJoint(Joint* joint)
 
 Bone* KinematicChain::getBone(std::string name)
 {
-    for (auto& bone : bones) {
-        if (bone.name == name) {
-            return &bone;
+    for (auto bone : bones) {
+        if (bone->name == name) {
+            return bone;
         }
     }
     return nullptr;
@@ -78,15 +76,15 @@ void KinematicChain::draw(environment_structure& environment)
 {
     // Draw the bones and articulations
     for (auto& bone : bones) {
-        bone.draw(environment);
-        articulation.model.translation = bone.end;
+        bone->draw(environment, position);
+        articulation.model.translation = bone->end + position;
         cgp::draw(articulation, environment);
-        articulation.model.translation = bone.start;
+        articulation.model.translation = bone->start + position;
         cgp::draw(articulation, environment);
     }
 }
 
-void KinematicChain::forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
+void KinematicChain::backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
 {
     // Implementation of the FABRIK algorithm
     // This function will take to bones, the target position and the tolerance
@@ -105,7 +103,7 @@ void KinematicChain::forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, f
 }
     
 
-void KinematicChain::backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
+void KinematicChain::forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance)
 {
     // Implementation of the FABRIK algorithm
     // This function will take to bones, the target position and the tolerance
@@ -124,7 +122,7 @@ void KinematicChain::backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, 
         target = bone->end;
     }
 }
-void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
+void KinematicChain::backwardApplyConstraints(std::vector<Bone*> bonesOrder)
 {
     // Implementation of the FABRIK algorithm
     // This function recusively apply the constraints to the KinematicChain
@@ -138,7 +136,7 @@ void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
     }
 }
 
-void KinematicChain::backwardApplyConstraints(std::vector<Bone*> bonesOrder)
+void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
 {
     // Implementation of the FABRIK algorithm
     // This function recusively apply the constraints to the KinematicChain
@@ -151,26 +149,37 @@ void KinematicChain::backwardApplyConstraints(std::vector<Bone*> bonesOrder)
             bone->jointFather->applyConstraintOnChild(skeleton);
         }
     }
-    Bone* left_hand = getBone("left_hand");
-    Bone* left_forearm = getBone("left_forearm");
+}
 
-    //calculons l'angle entre left_hand et left_forearm
-    float angle = angleBetween(left_hand->direction, left_forearm->direction);
-    
+void KinematicChain::fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance, int max_iter){
+    std::cout << "coucou" << std::endl;
+    //fixedpoint est start du dernier os
+    cgp::vec3 fixedPoint = bonesOrder.back()->start;
+    for (int i = 0; i < max_iter; i++) {
+        //backward FABRIK
+        backwardFabrik(bonesOrder, target, tolerance);
+        //constraint
+        backwardApplyConstraints(bonesOrder);
+        //forward FABRIK
+        forwardFabrik(bonesOrder, fixedPoint, tolerance);
+        //constraint
+        forwardApplyConstraints(bonesOrder);
+    }
+}
 
-    //std::cout << "#########################################################################" << std::endl;
-    //std::cout << "Angle between left_hand and left_forearm: " << angle << std::endl;
+void KinematicChain::fabrik(vec3 target, float tolerance, int max_iter)
+{
+    //on applique fabrik déjà implémenté avec un vecteur de pointeur sur les bones mais dans l'ordre inverse
+    std::vector<Bone*> bonesOrder;
+    for (auto it = bones.rbegin(); it != bones.rend(); ++it) {
+        bonesOrder.push_back(*it);
+    }
+    fabrik(bonesOrder, target, tolerance, max_iter);
 }
 
 void KinematicChain::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance, int max_iter)
 {
-    // Implementation of the FABRIK algorithm
-    // This function will take to bones, the target position and the tolerance
-    // It will try to move the end of the first bone to the target position 
-    // and will not move the start of the second
-
     //on va construire un vecteur de pointeur sur les bones pour les parcourir à l'endroit puis à l'envers
-
     
     std::vector<Bone*> bonesOrder;
     Bone* currentBone = targetBone;
@@ -181,44 +190,12 @@ void KinematicChain::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, floa
         bonesOrder.push_back(currentBone);
     }
     
-
-    cgp::vec3 fixedPoint = fixedBone->start;
-    for (int i = 0; i < max_iter; i++) {
-    
-        //forward FABRIK
-        forwardFabrik(bonesOrder, target, tolerance);
-        //constraint
-        forwardApplyConstraints(bonesOrder);
-        //backward FABRIK
-        backwardFabrik(bonesOrder, fixedPoint, tolerance);
-        //constraint
-        backwardApplyConstraints(bonesOrder);
-        
-        
-        //check if the target bone is close enough to the target
-        if (cgp::norm(targetBone->end - target) < tolerance) {
-            break;
-        }
-    }
-
-    //std::cout << "FABRIK finished" << std::endl;
-    //we are going to verify that the constraint for the hand is respected
-    Bone* left_hand = getBone("left_hand");
-    Bone* left_forearm = getBone("left_forearm");
-
-    //calculons l'angle entre left_hand et left_forearm
-    float angle = angleBetween(left_hand->direction, left_forearm->direction);
-    //std::cout << "Angle between left_hand and left_forearm: " << angle << std::endl;
+    //on applique fabrik déjà implémenté avec un vecteur de pointeur sur les bones
+    fabrik(bonesOrder, target, tolerance, max_iter);
 }
 
 void KinematicChain::fabrik(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance, int max_iter)
 {
-    //implementation that use bone names instead of pointers, easier to use
-    // Implementation of the FABRIK algorithm
-    // This function will take to bones, the target position and the tolerance
-    // It will try to move the end of the first bone to the target position 
-    // and will not move the start of the second
-
     Bone* targetBone = getBone(targetBoneName);
     Bone* fixedBone = getBone(fixedBoneName);
 
@@ -227,7 +204,7 @@ void KinematicChain::fabrik(std::string targetBoneName, std::string fixedBoneNam
         return;
     }
     if (targetBone->jointFather == nullptr) {
-        std::cerr << "Error: jointFather is null for bone 'left_hand'." << std::endl;
+        std::cerr << "Error: jointFather is null for targetBone." << std::endl;
         return;
     }
 
@@ -238,117 +215,217 @@ void KinematicChain::fabrik(std::string targetBoneName, std::string fixedBoneNam
     }
 }
 
-void HumanSkeleton::addJoint(std::string jointName, std::string boneFatherName, std::string boneChildName) {
-    Bone* boneFather = getBone(boneFatherName);
-    Bone* boneChild = getBone(boneChildName);
+void KinematicChain::setEndEffectorWorldPos(cgp::vec3 target)
+{
+    fabrik(target - position);
+    endEffectorPos = target - position;
+}
+void KinematicChain::setEndEffectorRelativePos(cgp::vec3 target)
+{
+    fabrik(target);
+    endEffectorPos = target;
+}
+void KinematicChain::moveEndEffector(cgp::vec3 move)
+{
+    setEndEffectorRelativePos(endEffectorPos + move);
+}
+void KinematicChain::translate(cgp::vec3 translation)
+{
+    position += translation;
+}
+void KinematicChain::setStartEffector(cgp::vec3 target)
+{
+    //on translate la chaine cinématique pour que le point de départ soit à la position cible 
+    //puis on applique Fabrik pour remettre la fin de la chaine à sa position initiale
 
-    if (boneFather != nullptr && boneChild != nullptr) {
-        // Create the joint
-        Joint* joint = new Joint(jointName, boneFather, boneChild);
-        // Add the joint to the skeleton
-        joints.push_back(joint);
-
-        boneFather->jointChild = joint;
-        boneChild->jointFather = joint;
-
-        std::cout << "Joint " << jointName << " added between " << boneFatherName << " and " << boneChildName << std::endl;
-        std::cout << "Joint name: " << joint->name << std::endl;
-    } else {
-        std::cerr << "Error: Joint not created, missing bones: "
-                  << boneFatherName << " or " << boneChildName << std::endl;
-    }
+    cgp::vec3 translation = target - position;
+    translate(translation);
+    moveEndEffector(-translation);
 }
 
-void HumanSkeleton::addParentRotule(std::string jointName, std::string boneFatherName, std::string boneChildName, float maxAngle) {
-    Bone* boneFather = getBone(boneFatherName);
-    Bone* boneChild = getBone(boneChildName);
-
-    if (boneFather != nullptr && boneChild != nullptr) {
-        // Create the joint
-        Joint* joint = new ParentRotule(jointName, boneFather, boneChild, maxAngle);
-        // Add the joint to the skeleton
-        joints.push_back(joint);
-
-        boneFather->jointChild = joint;
-        boneChild->jointFather = joint;
-
-        std::cout << "Joint " << jointName << " added between " << boneFatherName << " and " << boneChildName << std::endl;
-    } else {
-        std::cerr << "Error: Joint not created, missing bones: "
-                  << boneFatherName << " or " << boneChildName << std::endl;
+Arm::Arm(float scale, bool isLeft)
+{
+    if (isLeft) {
+        scale = -scale;
     }
+    // Initialize the arm with bones and joints
+    vec3 navelPos = cgp::vec3(0, 0, 0);
+    vec3 shoulderPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * 0.25);
+    vec3 elbowPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * 0.062);
+    vec3 wristPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * -0.083);
+    vec3 handPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * -0.183);
+
+    Bone* trapezius = new Bone("ribs", navelPos, shoulderPos);
+    Bone* bicep = new Bone("bicep", shoulderPos, elbowPos);
+    Bone* forearm = new Bone("forearm", elbowPos, wristPos);
+    Bone* hand = new Bone("hand", wristPos, handPos);
+
+    // Initialize the joints
+    Joint* shoulder = new Joint("shoulder", trapezius, bicep);
+    Joint* elbow = new ParentRotule("elbow", bicep, forearm, 0.5f);
+    Joint* wrist = new ParentRotule("wrist", forearm, hand, 1.7f);
+
+    std::cout << "bones and joints created" << std::endl;
+    // Add bones and joints to the arm
+    addBone(trapezius);
+    addBone(bicep);
+    addBone(forearm);
+    addBone(hand);
+
+    addJoint(shoulder);
+    addJoint(elbow);
+    addJoint(wrist);
+    std::cout << "bones and joints added" << std::endl;
+
+    position = cgp::vec3(0, 0, 0);
 }
 
+void Arm::initialize()
+{
+    //initialize the arm must be done after OpenGl is initialized
+    KinematicChain::initialize();
+}
 
+cgp::vec3 Arm::getShoulderPos()
+{
+    return getBone("bicep")->start;
+}
+
+Leg::Leg(float scale, bool isLeft)
+{
+    if (isLeft) {
+        scale = -scale;
+    }
+    // Initialize the arm with bones and joints
+    vec3 navelPos = cgp::vec3(0, 0, 0);
+    vec3 hipPos = cgp::vec3(0.5 * FEETSPACING * scale, 0, -std::abs(scale) * 0.1);
+    vec3 kneePos = cgp::vec3(0.5 * FEETSPACING * scale, 0, -std::abs(scale) * 0.3);
+    vec3 anklePos = cgp::vec3(0.5 * FEETSPACING * scale, 0, -std::abs(scale) * 0.54);
+    vec3 footPos = cgp::vec3(0.5 *FEETSPACING * scale, std::abs(scale) * FOOT, -std::abs(scale) * 0.54);
+
+    Bone* pelvis = new Bone("pelvis", navelPos, hipPos);
+    Bone* thigh = new Bone("thigh", hipPos, kneePos);
+    Bone* calf = new Bone("calf", kneePos, anklePos);
+    Bone* foot = new Bone("foot", anklePos, footPos);
+
+    // Initialize the joints
+    Joint* hip = new Joint("hip", pelvis, thigh);
+    Joint* knee = new ParentRotule("knee", thigh, calf, 1.5f);
+    Joint* ankle = new ParentRotule("ankle", calf, foot, 1.7f);
+
+    // Add bones and joints to the arm
+    addBone(pelvis);
+    addBone(thigh);
+    addBone(calf);
+    addBone(foot);
+
+    addJoint(hip);
+    addJoint(knee);
+    addJoint(ankle);
+
+    position = cgp::vec3(0, 0, 0);
+
+}
+
+void Leg::initialize()
+{
+    //initialize the arm must be done after OpenGl is initialized
+    KinematicChain::initialize();
+}
+
+cgp::vec3 Leg::getHipPos()
+{
+    return getBone("thigh")->start;
+}
+
+void IsoceleTriangle::moveAandB(cgp::vec3 newA, cgp::vec3 newB)
+{
+    //find the best point C to keep the triangle isoceles with the same height with the new A and B
+    //let's move a and b to the new position
+    a = newA;
+    b = newB;
+    //find the new csss
+    cgp::vec3 ab = b - a;
+    cgp::vec3 ab_normal = cgp::cross(ab, normal);
+    ab_normal = ab_normal / cgp::norm(ab_normal);
+    c = a + ab / 2.0f + ab_normal * height;
+    
+    //update the positionRef and then move the point so C = 0
+    positionRef += c;
+    a -= c;
+    b -= c;
+    c -= c;
+
+    //update the normal
+    normal = cgp::cross(b - a, c - a);
+    normal = normal / cgp::norm(normal);
+}
+
+void IsoceleTriangle::moveC(cgp::vec3 newC)
+{
+    positionRef += newC;
+}
+
+void IsoceleTriangle::setC(cgp::vec3 newC)
+{
+    positionRef = newC;
+}
+
+HumanSkeleton::HumanSkeleton(float scale, cgp::vec3 position)
+: scale(scale),
+      position(position),
+      torso(leftArm.getShoulderPos(), rightArm.getShoulderPos(), cgp::vec3(0, 0, 0)),
+      pelvis(leftLeg.getHipPos(), rightLeg.getHipPos(), cgp::vec3(0, 0, 0))
+{
+    this->scale = scale;
+    this->position = position;
+  
+    leftArm = Arm(scale, true);
+    rightArm = Arm(scale, false);
+    leftLeg = Leg(scale, true);
+    rightLeg = Leg(scale, false);
+
+    leftArm.translate(position);
+    rightArm.translate(position);
+    leftLeg.translate(position);
+    rightLeg.translate(position);
+
+    leftArm.skeleton = this;
+    rightArm.skeleton = this;
+    leftLeg.skeleton = this;
+    rightLeg.skeleton = this;
+}
 
 void HumanSkeleton::initialize()
 {
-    //initialize the bones
-    //head
-    addBone(Bone("left_foot", scale * vec3{-FEETSPACING/2,0,0}, scale * vec3{-FEETSPACING/2-FOOT,0,0}));
-    addBone(Bone("right_foot",  scale * vec3{FEETSPACING/2,0,0},  scale * vec3{FEETSPACING/2+FOOT,0,0}));
+    leftArm.initialize();
+    rightArm.initialize();
+    leftLeg.initialize();
+    rightLeg.initialize();
+}
 
-    vec3 left_knee = vec3{-FEETSPACING/2 + std::sin(LEGANGLE)*TIBIA,0,std::cos(LEGANGLE)*TIBIA};
-    vec3 right_knee = vec3{FEETSPACING/2 - std::sin(LEGANGLE)*TIBIA,0,std::cos(LEGANGLE)*TIBIA};
+void HumanSkeleton::draw(environment_structure& environment)
+{
+    leftArm.draw(environment);
+    rightArm.draw(environment);
+    leftLeg.draw(environment);
+    rightLeg.draw(environment);
+}
 
-    addBone(Bone("left_tibia",   scale * left_knee, scale * vec3{-FEETSPACING/2,0,0}));
-    addBone(Bone("right_tibia", scale * right_knee,  scale * vec3{FEETSPACING/2,0,0}));
+void HumanSkeleton::translate(cgp::vec3 translation)
+{
+    position += translation;
+    leftArm.translate(translation);
+    rightArm.translate(translation);
+    leftLeg.translate(translation);
+    rightLeg.translate(translation);
+}
 
-    vec3 left_hip = left_knee + vec3{+std::sin(LEGANGLE)*THIGH,0,std::cos(LEGANGLE)*THIGH};
-    vec3 right_hip = right_knee + vec3{-std::sin(LEGANGLE)*THIGH,0,std::cos(LEGANGLE)*THIGH};
-    addBone(Bone("left_thigh",  scale * left_hip, scale * left_knee));
-    addBone(Bone("right_thigh",  scale * right_hip,  scale * right_knee));
 
-    vec3 navel = (left_hip + right_hip)/2 + vec3{0,0,HIP};
-    addBone(Bone("left_hip", scale * navel,  scale * left_hip));
-    addBone(Bone("right_hip", scale * navel, scale * right_hip));
-
-    vec3 neck = navel + vec3{0,0,TORSO};
-    addBone(Bone("body",  scale * navel,  scale * neck));
-
-    vec3 left_shoulder = neck + vec3{-std::cos(ARMANGLE)*SHOULDER,0,-std::sin(ARMANGLE)*SHOULDER};
-    vec3 right_shoulder = neck + vec3{std::cos(ARMANGLE)*SHOULDER,0,-std::sin(ARMANGLE)*SHOULDER};
-    addBone(Bone("left_shoulder",  scale * neck,  scale * left_shoulder));
-    addBone(Bone("right_shoulder",  scale * neck,  scale * right_shoulder));
-
-    vec3 left_elbow = left_shoulder + vec3{-std::cos(ARMANGLE)*UPPER_ARM,0,-std::sin(ARMANGLE)*UPPER_ARM};
-    vec3 right_elbow = right_shoulder + vec3{std::cos(ARMANGLE)*UPPER_ARM,0,-std::sin(ARMANGLE)*UPPER_ARM};
-    addBone(Bone("left_upper_arm",  scale * left_shoulder,  scale * left_elbow));
-    addBone(Bone("right_upper_arm",  scale * right_shoulder,  scale * right_elbow));
-
-    vec3 left_wrist = left_elbow + vec3{-std::cos(ARMANGLE)*FOREARM,0,-std::sin(ARMANGLE)*FOREARM};
-    vec3 right_wrist = right_elbow + vec3{std::cos(ARMANGLE)*FOREARM,0,-std::sin(ARMANGLE)*FOREARM};
-    addBone(Bone("left_forearm",  scale * left_elbow,  scale * left_wrist));
-    addBone(Bone("right_forearm",  scale * right_elbow,  scale * right_wrist));
-
-    addBone(Bone("left_hand",  scale * left_wrist,  scale * (left_wrist - vec3{HAND,0,0})));
-    addBone(Bone("right_hand",  scale * right_wrist,  scale * (right_wrist + vec3{HAND,0,0})));
-
-    addBone(Bone("neck",  scale * neck,  scale * (neck + vec3{0,0,HEAD})));
-
-    //initialize the joints
-
-    //spine
-    addJoint("Neck", "body", "neck");
+void HumanSkeleton::moveLegs(cgp::vec3 leftFootMove, cgp::vec3 rightFootMove)
+{
+    leftLeg.setEndEffectorWorldPos(leftFootMove);
+    rightLeg.setEndEffectorWorldPos(rightFootMove);
+    //update the pelvis position
     
-    //arms
-    addParentRotule("LeftShoulder", "left_shoulder", "left_upper_arm", 0.5f);
-    addJoint("RightShoulder", "right_shoulder", "right_upper_arm");
-    addJoint("LeftElbow", "left_upper_arm", "left_forearm");
-    addJoint("RightElbow", "right_upper_arm", "right_forearm");
-    addParentRotule("LeftWrist", "left_forearm", "left_hand", 0.5f);
-    addParentRotule("RightWrist", "right_forearm", "right_hand", 0.5f);
-
-    //legs
-    addJoint("LeftHip", "left_hip", "left_thigh");
-    addJoint("RightHip", "right_hip", "right_thigh");
-    addJoint("LeftKnee", "left_thigh", "left_tibia");
-    addJoint("RightKnee", "right_thigh", "right_tibia");
-    addJoint("LeftAnkle", "left_tibia", "left_foot");
-    addJoint("RightAnkle", "right_tibia", "right_foot");
-
-    //initialize the skeleton
-    KinematicChain::initialize();
-    std::cout << "Skeleton initialized" << std::endl;
-
 }

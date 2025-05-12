@@ -10,6 +10,8 @@ Joint::Joint(std::string name, Bone* boneFather, Bone* boneChild)
     this->name = name;
     this->boneFather = boneFather;
     this->boneChild = boneChild;
+    boneFather->jointChild = this;
+    boneChild->jointFather = this;
 }
 
 void Joint::applyConstraintOnChild(HumanSkeleton *skeleton)
