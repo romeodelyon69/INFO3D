@@ -2,6 +2,8 @@
 
 #include "cgp/cgp.hpp"
 
+#define PI 3.14159265358979323846f
+
 inline float angleBetweenSigned(cgp::vec3 a, cgp::vec3 b, cgp::vec3 ref_axis) {
     cgp::vec3 a_n = cgp::normalize(a);
     cgp::vec3 b_n = cgp::normalize(b);

@@ -2,7 +2,8 @@
 
 #include "cgp/cgp.hpp"
 #include "stdlib.h"
-#include "skeleton.hpp"
+#include "kinematicChain.hpp"
+
 
 using namespace cgp;
 

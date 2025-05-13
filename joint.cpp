@@ -40,7 +40,11 @@ void GeneralRotule::applyConstraintOnChild(HumanSkeleton *skeleton)
 {   
     //We are going to move the child bone to verify the constraint 
     cgp::vec3 translation =  boneFather->end - boneChild->start;
-    boneChild->translate(translation);
+   
+    if(cgp::norm(translation) > 0.01f){
+        std::cout << "translation child : AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH " << translation << std::endl;
+    }
+    //boneChild->translate(translation);
     
     //get the position of the child bone 
 
@@ -67,10 +71,9 @@ void GeneralRotule::applyConstraintOnChild(HumanSkeleton *skeleton)
 
 void GeneralRotule::applyConstraintOnFather(HumanSkeleton *skeleton)
 {
-    
-
     cgp::vec3 translation =  boneChild->start - boneFather->end;
-    boneFather->translate(translation);
+    //std::cout << "translation father : " << translation << std::endl;
+    //boneFather->translate(translation);
     //get the angle between the father bone and the axis
     float angle = angleBetween(boneChild->direction, axis);
 

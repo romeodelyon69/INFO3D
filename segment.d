@@ -1,4 +1,4 @@
-src/skeleton.o: src/skeleton.cpp src/skeleton.hpp \
+src/segment.o: src/segment.cpp src/segment.hpp \
  ../../cgp/library/cgp/cgp.hpp ../../cgp/library/cgp/cgp_parameters.hpp \
  ../../cgp/library/cgp/01_base/base.hpp \
  ../../cgp/library/cgp/01_base/error/error.hpp \
@@ -129,10 +129,9 @@ src/skeleton.o: src/skeleton.cpp src/skeleton.hpp \
  ../../cgp/library/cgp/20_format_parser/mesh_loader/obj_advanced/obj_advanced.hpp \
  ../../cgp/library/cgp/21_scene_project_helper/scene_project_helper.hpp \
  ../../cgp/library/cgp/21_scene_project_helper/path/path.hpp \
- src/joint.hpp src/kinematicChain.hpp src/environment.hpp src/segment.hpp \
- src/Nmath.hpp
+ src/environment.hpp
 
-src/skeleton.hpp:
+src/segment.hpp:
 
 ../../cgp/library/cgp/cgp.hpp:
 
@@ -396,12 +395,4 @@ src/skeleton.hpp:
 
 ../../cgp/library/cgp/21_scene_project_helper/path/path.hpp:
 
-src/joint.hpp:
-
-src/kinematicChain.hpp:
-
 src/environment.hpp:
-
-src/segment.hpp:
-
-src/Nmath.hpp:

@@ -113,24 +113,52 @@ void scene_structure::display_frame()
 	//left hand = -1.327092 0.000000 2.011435
 
 	vec3 target = { -1.327092f + std::cos(timer.t) * 0.2 , 0.0f, 2.011435f - std::sin(timer.t) * 0.2};
-	vec3 translationY = {0, std::cos(timer.t) * 0.01, 0};
+	
+	vec3 navelPos = {0,0.5f * std::sin(timer.t),1 };
+	vec3 ribDir = {0,0.5f * std::sin(timer.t) + std::sin(timer.t * 3.1415) * 0.1,1.5f };
+	ribDir = cgp::normalize(ribDir);
+	float scale = 5.0f;
+	float ribLength = cgp::norm(cgp::vec3(0.09*scale, 0, std::abs(scale) * 0.25));
+	vec3 shoulderPos = navelPos + ribDir * ribLength;
+	vec3 position = {0, std::sin(timer.t/10) * 0.5f, 2.0f };
 
-	vec3 leftFootTarget = {-FEETSPACING, 0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
-	vec3 rightFootTarget = {FEETSPACING, -0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) };
+
+	vec3 leftFootTarget = {-FEETSPACING, 0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) + 0.38f };
+	vec3 rightFootTarget = {FEETSPACING, -0.5f * std::cos(timer.t), 0.1f * std::abs(std::sin(timer.t)) +0.38f};
 
 	/*
 	arm.setEndEffectorWorldPos(target);
-	arm.setStartEffector(translationY);
+	if (timer.t > 3.0f){
+		arm.setStartEffector(navelPos);
+	}*/
+	arm.setEndEffectorWorldPos(target);
+	if (timer.t > 3.0f){
+		arm.setStartEffector(navelPos);
+	}
+	if (timer.t > 8.0f){
+		arm.moveFromShoulderToHandWorldPos(shoulderPos);
+	}
+	
+		
+	
+	
 	// Draw the human skeleton
 	arm.draw(environment);
-	*/
+	
 
-	//human.moveLegs(leftFootTarget, rightFootTarget);
-	human.movePelvis(translationY);
-	human.draw(environment);
+	//human.setPosLegs(leftFootTarget, rightFootTarget);
+	//human.setPelvisPos(position);
+	//human.draw(environment);
+	
 
 	// Draw the target
 	targetSphere.model.translation = target;
+	draw(targetSphere, environment);
+
+	targetSphere.model.translation = navelPos;
+	draw(targetSphere, environment);
+
+	targetSphere.model.translation = shoulderPos;
 	draw(targetSphere, environment);
 
 	if (gui.display_wireframe) {
