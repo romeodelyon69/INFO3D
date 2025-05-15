@@ -46,7 +46,7 @@ struct scene_structure : cgp::scene_inputs_generic {
 	mesh_drawable cube2;
 
 	Arm arm = Arm(5.0f, false);
-	HumanSkeleton human = HumanSkeleton(3.0f, {0,0,2.0f});
+	//HumanSkeleton human = HumanSkeleton(3.0f, {0,0,2.0f});
 	mesh_drawable targetSphere;
 
 

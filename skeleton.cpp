@@ -12,25 +12,66 @@ Arm::Arm(float scale, bool isLeft)
         scale = -scale;
     }
     // Initialize the arm with bones and joints
-    vec3 navelPos = cgp::vec3(0, 0, 0);
-    vec3 shoulderPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * 0.25);
-    vec3 elbowPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * 0.062);
-    vec3 wristPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * -0.083);
-    vec3 handPos = cgp::vec3(0.09*scale, 0, std::abs(scale) * -0.183);
+    float ribLength = std::abs(scale)* 0.27f;
+    float bicepLength = std::abs(scale) * 0.188f;
+    float forearmLength = std::abs(scale) * 0.145f;
+    float handLength = std::abs(scale) * 0.1f;
 
-    Bone* trapezius = new Bone("ribs", navelPos, shoulderPos);
-    Bone* bicep = new Bone("bicep", shoulderPos, elbowPos);
-    Bone* forearm = new Bone("forearm", elbowPos, wristPos);
-    Bone* hand = new Bone("hand", wristPos, handPos);
+
+    vec3 navelPos = cgp::vec3(0, 0, 0);
+    vec3 shoulderPos = cgp::vec3(0, ribLength, 0);
+    vec3 elbowPos = cgp::vec3(0, (ribLength + bicepLength), 0);
+    vec3 wristPos = cgp::vec3( 0, (ribLength + bicepLength + forearmLength), 0);
+    vec3 handPos = cgp::vec3(0, (ribLength + bicepLength + forearmLength + handLength), 0);
+
+    cgp::vec3 x = cgp::vec3(1, 0, 0);
+    cgp::vec3 y = cgp::vec3(0, 1, 0);
+    cgp::vec3 z = cgp::vec3(0, 0, 1);
+
+    cgp::frame ribFrame;
+    cgp::frame bicepFrame;
+    cgp::frame forearmFrame;
+    cgp::frame handFrame;
+
+
+    if (isLeft) {
+        ribFrame = cgp::frame(y, z, navelPos);
+        bicepFrame = cgp::frame(y, z, shoulderPos);
+        forearmFrame = cgp::frame(y, z, elbowPos);
+        handFrame = cgp::frame(y, z, wristPos);
+    }
+    else {
+        ribFrame = cgp::frame(y, z, navelPos);
+        bicepFrame = cgp::frame(y, z, shoulderPos);
+        forearmFrame = cgp::frame(y, z, elbowPos);
+        handFrame = cgp::frame(y, z, wristPos);
+    }
+
+    //print rib frame
+    std::cout << "rib frame : " << ribFrame.position << std::endl;
+    std::cout << "rib ux : " << ribFrame.ux() << std::endl;
+    std::cout << "rib uy : " << ribFrame.uy() << std::endl;
+    std::cout << "rib uz : " << ribFrame.uz() << std::endl;
+
+    std::cout << "bicep frame : " << bicepFrame.position << std::endl;
+    std::cout << "bicep ux : " << bicepFrame.ux() << std::endl;
+    std::cout << "bicep uy : " << bicepFrame.uy() << std::endl;
+    std::cout << "bicep uz : " << bicepFrame.uz() << std::endl;
+    
+
+    Bone* rib = new Bone("rib", ribFrame, ribLength);
+    Bone* bicep = new Bone("bicep", bicepFrame, bicepLength);
+    Bone* forearm = new Bone("forearm", forearmFrame, forearmLength);
+    Bone* hand = new Bone("hand", handFrame, handLength);
 
     // Initialize the joints
-    Joint* shoulder = new GeneralRotule("shoulder", trapezius, bicep, vec3(0, 1, 0),1 * PI / 2);
-    Joint* elbow = new GeneralRotule("elbow", bicep, forearm, vec3(0, 1, 0), 1 * PI / 2);
-    Joint* wrist = new ParentRotule("wrist", forearm, hand, 1 * PI / 2);
+    Joint* shoulder = new Joint("shoulder", rib, bicep);
+    Joint* elbow = new Hinge("elbow", bicep, forearm, PI/2);
+    Joint* wrist = new ParentRotule("wrist", forearm, hand, PI / 4);
 
     std::cout << "bones and joints created" << std::endl;
     // Add bones and joints to the arm
-    addBone(trapezius);
+    addBone(rib);
     addBone(bicep);
     addBone(forearm);
     addBone(hand);
@@ -40,10 +81,8 @@ Arm::Arm(float scale, bool isLeft)
     addJoint(wrist);
     std::cout << "bones and joints added" << std::endl;
 
-    position = cgp::vec3(0, 0, 0);
-
     std::cout << "arm created" << std::endl;
-    std::cout << " ribs length : " << trapezius->length << std::endl;
+    std::cout << " ribs direction : " << rib->getDirection() << std::endl;
 }
 
 void Arm::initialize()
@@ -54,56 +93,32 @@ void Arm::initialize()
 
 cgp::vec3 Arm::getShoulderPos()
 {
-    return getBone("bicep")->start;
+    return getBone("bicep")->getStart();
 }
 
 void Arm::moveFromHandToShoulder(cgp::vec3 handTarget)
 {
     //on va déplacer la main à la position cible
-    fabrik("hand", "bicep", handTarget - position);
+    fabrik("hand", "bicep", handTarget);
 }
-void Arm::moveFromShoulderToHandWorldPos(cgp::vec3 shoulderTarget)
+void Arm::moveFromShoulderToHand(cgp::vec3 shoulderTarget)
 {
     //on va déplacer l'épaule à la position cible
-    setBoneStartWorldPos("bicep", shoulderTarget);
+    fabrikAscendingTree("bicep", "hand", shoulderTarget);
 }
-void Arm::moveFromShoulderToHandRelativePos(cgp::vec3 shoulderTarget)
+void Arm::moveHand(cgp::vec3 handTarget)
 {
-    //on va déplacer l'épaule à la position cible
-    std::cout<<"i'm here"<<std::endl;
-    setBoneStartRelativePos("bicep", shoulderTarget);
-    std::cout<<"i'm also there"<<std::endl;
+    //on va déplacer la main à la position cible
+    fabrik("hand", "rib", handTarget);
 }
 
-void Arm::updateJoints()
-{
-    //on met à jour la position de l'axe de l'épaule qui est la normale du torso
-    Joint* shoulder = getJoint("shoulder");
-    Joint* elbow = getJoint("elbow");
-
-    //Joint* wrist = getJoint("wrist");         //wrist joint axis is defined by the forearm
-
-    // Cast dynamique vers GeneralRotule*
-    GeneralRotule* shoulderRotule = dynamic_cast<GeneralRotule*>(shoulder);
-    if (shoulderRotule != nullptr) {
-        shoulderRotule->set(cgp::normalize(skeleton->torso.normal), 1 * PI / 2);
-    } else {
-        std::cerr << "Error: Joint 'shoulder' is not a GeneralRotule." << std::endl;
-    }
-
-    GeneralRotule* elbowRotule = dynamic_cast<GeneralRotule*>(elbow);
-    if (elbowRotule != nullptr) {
-        elbowRotule->set(cgp::normalize(skeleton->torso.normal), 1 * PI / 2);
-    } else {
-        std::cerr << "Error: Joint 'elbow' is not a GeneralRotule." << std::endl;
-    }
-}
 
 Leg::Leg(float scale, bool isLeft)
 {
     if (isLeft) {
         scale = -scale;
     }
+    /*
     // Initialize the arm with bones and joints
     vec3 navelPos = cgp::vec3(0, 0, 0);
     vec3 hipPos = cgp::vec3(0.5 * FEETSPACING * scale, 0, -std::abs(scale) * 0.1);
@@ -130,8 +145,7 @@ Leg::Leg(float scale, bool isLeft)
     addJoint(hip);
     addJoint(knee);
     addJoint(ankle);
-
-    position = cgp::vec3(0, 0, 0);
+    */
 }
 
 void Leg::initialize()
@@ -142,43 +156,21 @@ void Leg::initialize()
 
 cgp::vec3 Leg::getHipPos()
 {
-    return getBone("thigh")->start;
+    return getBone("thigh")->getStart();
 }
 
 void Leg::moveFromFootToHip(cgp::vec3 footTarget)
 {
     //on va déplacer le pied à la position cible
-    fabrik("foot", "thigh", footTarget - position);
+    fabrik("foot", "thigh", footTarget);
 }
-void Leg::moveFromHipToFootWorldPos(cgp::vec3 hipTarget)
+void Leg::moveFromHipToFoot(cgp::vec3 hipTarget)
 {
     //on va déplacer la hanche à la position cible
-    setBoneStartWorldPos("thigh", hipTarget);
-}
-void Leg::moveFromHipToFootRelativePos(cgp::vec3 hipTarget)
-{
-    //on va déplacer la hanche à la position cible
-    setBoneStartRelativePos("thigh", hipTarget);
+    fabrikAscendingTree("thigh", "foot", hipTarget);
 }
 
-void Leg::updateJoints()
-{
-    Joint* ankle = getJoint("ankle");
-    GeneralRotule* ankleRotule = dynamic_cast<GeneralRotule*>(ankle); // Utilisation d'un nouveau nom
-    if (ankleRotule != nullptr) {
-        ankleRotule->set(cgp::normalize(skeleton->torso.normal), PI / 2);
-    } else {
-        std::cerr << "Error: Joint 'ankle' is not a GeneralRotule." << std::endl;
-    }
 
-    Joint* knee = getJoint("knee");
-    GeneralRotule* kneeRotule = dynamic_cast<GeneralRotule*>(knee);
-    if (kneeRotule != nullptr) {
-        kneeRotule->set(cgp::normalize(skeleton->pelvis.heightDirection), PI / 2);
-    } else {
-        std::cerr << "Error: Joint 'elbow' is not a GeneralRotule." << std::endl;
-    }
-}
 
 IsoceleTriangle::IsoceleTriangle(){}
 IsoceleTriangle::IsoceleTriangle(cgp::vec3 a, cgp::vec3 b, cgp::vec3 c)
@@ -201,32 +193,15 @@ IsoceleTriangle::IsoceleTriangle(cgp::vec3 a, cgp::vec3 b, cgp::vec3 c)
 
 void IsoceleTriangle::moveAandB(cgp::vec3 newA, cgp::vec3 newB)
 {
-    //find the best point C to keep the triangle isoceles with the same height with the new A and B
-    //let's move a and b to the new position
-    a = newA;
-    b = newB;
-    //find the new csss
-    cgp::vec3 ab = b - a;
-    cgp::vec3 ab_normal = cgp::cross(ab, normal);
-    ab_normal = ab_normal / cgp::norm(ab_normal);
-    c = a + ab / 2.0f + ab_normal * height;
+    //translate the triangle so that the base is aligned with the new base
+    newA -= positionRef;
+    newB -= positionRef;
     
-    //update the positionRef and then move the point so C = 0
-    positionRef += c;
-    a -= c;
-    b -= c;
-    c -= c;
+    cgp::vec3 newBaseMiddle = (newB + newA)/2;
+    cgp::vec3 oldBaseMiddle = (b + a)/2;
 
-    //update the normal
-    normal = cgp::cross(b - a, c - a);
-    normal = normal / cgp::norm(normal);
-
-    //update the heightDirection
-    heightDirection = cgp::normalize((b + a) / 2 - c);
-    //update the height
-    height = cgp::norm(c - (a + b) / 2);
-    //update the base
-    base = cgp::norm(b - a);
+    cgp::vec3 translation = newBaseMiddle - oldBaseMiddle;
+    positionRef += translation;
 }
 
 void IsoceleTriangle::moveC(cgp::vec3 translationC)
@@ -268,7 +243,6 @@ void IsoceleTriangle::draw(environment_structure& environment)
 HumanSkeleton::HumanSkeleton(float scale, cgp::vec3 position)
 {
     this->scale = scale;
-    this->position = position;
   
     leftArm = Arm(scale, true);
     rightArm = Arm(scale, false);
@@ -278,10 +252,10 @@ HumanSkeleton::HumanSkeleton(float scale, cgp::vec3 position)
     torso = IsoceleTriangle(leftArm.getShoulderPos(), rightArm.getShoulderPos(), cgp::vec3(0, 0, 0));   //a is left, b is right
     pelvis = IsoceleTriangle(leftLeg.getHipPos(), rightLeg.getHipPos(), cgp::vec3(0, 0, 0));    //a is left, b is right
 
-    leftArm.translate(position);
-    rightArm.translate(position);
-    leftLeg.translate(position);
-    rightLeg.translate(position);
+    leftArm.translateBones(position);
+    rightArm.translateBones(position);
+    leftLeg.translateBones(position);
+    rightLeg.translateBones(position);
 
     torso.translate(position);
     pelvis.translate(position);
@@ -316,21 +290,14 @@ void HumanSkeleton::draw(environment_structure& environment)
     pelvis.draw(environment);
 }
 
-void HumanSkeleton::updateJoints()
-{
-    leftArm.updateJoints();
-    rightArm.updateJoints();
-    leftLeg.updateJoints();
-    rightLeg.updateJoints();
-}
 
 void HumanSkeleton::translate(cgp::vec3 translation)
 {
     position += translation;
-    leftArm.translate(translation);
-    rightArm.translate(translation);
-    leftLeg.translate(translation);
-    rightLeg.translate(translation);
+    leftArm.translateBones(translation);
+    rightArm.translateBones(translation);
+    leftLeg.translateBones(translation);
+    rightLeg.translateBones(translation);
 }
 
 void HumanSkeleton::movePelvis(cgp::vec3 translation)
@@ -340,55 +307,10 @@ void HumanSkeleton::movePelvis(cgp::vec3 translation)
 }
 void HumanSkeleton::setPelvisPos(cgp::vec3 position)
 {
-    //set the pelvis position and move the legs
-    std::cout<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
-    this->position = position;
-    pelvis.setC(position);
-    std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << std::endl;
-    torso.setC(position);
-    std::cout << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" << std::endl;
-    updateJoints();
-    
-    //translate the limbs to match the new pelvis position
-    leftArm.setReferencePos(position);
-    rightArm.setReferencePos(position);
-    leftLeg.setReferencePos(position);
-    rightLeg.setReferencePos(position);
-    
-    std::cout << "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD" << std::endl;
 
-
-    //move the legs to match the new pelvis position
-    leftLeg.moveFromHipToFootRelativePos(pelvis.a);
-    rightLeg.moveFromHipToFootRelativePos(pelvis.b);
-
-    std::cout << "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" << std::endl;
-
-    //move the arms to match the new torso position
-    leftArm.moveFromShoulderToHandRelativePos(torso.a);
-    std::cout << "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" << std::endl;
-    rightArm.moveFromShoulderToHandRelativePos(torso.b);
-
-    std::cout << "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG" << std::endl;
-
-
-    std::cout << "pelvis pos a : " << pelvis.a << std::endl;
-    std::cout << "leftLeg pos : " << leftLeg.getHipPos() << std::endl;
-
-    std::cout << "pelvis ref : " << pelvis.positionRef << std::endl;
-    std::cout << "leftLeg ref : " << leftLeg.position << std::endl;
 }
 
 void HumanSkeleton::setPosLegs(cgp::vec3 leftFootPos, cgp::vec3 rightFootPos)
 {
-    //move legs : 
-    leftLeg.setEndEffectorWorldPos(leftFootPos);
-    rightLeg.setEndEffectorWorldPos(rightFootPos);
-    //update pelvis 
-    std::cout<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
-    std::cout << "leftLeg pos : " << leftLeg.getHipPos() << std::endl;
-    std::cout << "rightLeg pos : " << rightLeg.getHipPos() << std::endl;
-    pelvis.moveAandB(leftLeg.getHipPos(), rightLeg.getHipPos());
-    std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << std::endl;
-    setPelvisPos(pelvis.positionRef);
+
 }

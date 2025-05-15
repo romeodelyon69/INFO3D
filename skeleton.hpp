@@ -32,10 +32,8 @@ class Arm : public KinematicChain{
 
         cgp::vec3 getShoulderPos();
         void moveFromHandToShoulder(cgp::vec3 handTarget);
-        void moveFromShoulderToHandWorldPos(cgp::vec3 shoulderTarget);
-        void moveFromShoulderToHandRelativePos(cgp::vec3 shoulderTarget);
-
-        void updateJoints();
+        void moveFromShoulderToHand(cgp::vec3 shoulderTarget);
+        void moveHand(cgp::vec3 handTarget);
 };
 
 class Leg : public KinematicChain{
@@ -45,10 +43,7 @@ class Leg : public KinematicChain{
 
         cgp::vec3 getHipPos();
         void moveFromFootToHip(cgp::vec3 footTarget);
-        void moveFromHipToFootWorldPos(cgp::vec3 hipTarget);
-        void moveFromHipToFootRelativePos(cgp::vec3 hipTarget);
-
-        void updateJoints();
+        void moveFromHipToFoot(cgp::vec3 hipTarget);
 };
 
 class IsoceleTriangle{
@@ -95,7 +90,6 @@ class HumanSkeleton {
         void initialize();
         void draw(environment_structure& environment);
 
-        void updateJoints();
         void translate(cgp::vec3 translation);
         void movePelvis(cgp::vec3 translation);
         void setPelvisPos(cgp::vec3 position);

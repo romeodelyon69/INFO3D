@@ -6,42 +6,115 @@
 
 using namespace cgp;
 
+Bone ::Bone(std::string name, cgp::frame frame, float length)
+{
+    this->name = name;
+    this->frameAbsolut = frame;
+    this->length = length;
+}
 void Bone::initialize()
 {
-    bone.display_type = curve_drawable_display_type::Segments;
-    bone.initialize_data_on_gpu({{0,0,0},{1,0,0}});
+    bone.initialize();
 }
-
+cgp::vec3 Bone::getStart()
+{
+    return frameAbsolut.position;
+}
+cgp::vec3 Bone::getEnd()
+{
+    return frameAbsolut.position + getDirection() * length;
+}
+cgp::vec3 Bone::getDirection()
+{
+    return cgp::normalize(frameAbsolut.uz());
+}
+cgp::vec3 Bone::getX()
+{
+    return cgp::normalize(frameAbsolut.ux());
+}
+cgp::vec3 Bone::getY()
+{
+    return cgp::normalize(frameAbsolut.uy());
+}
+cgp::vec3 Bone::getZ()
+{
+    return cgp::normalize(frameAbsolut.uz());
+}
+void Bone::translate(cgp::vec3 translation)
+{
+    frameAbsolut = frameAbsolut + translation;
+}
 void Bone::setEnd(cgp::vec3 end)
 {
-    this->end = end;
-    direction = (end - start);
-    length = cgp::norm(direction);
-    direction = (end - start) / length;
+    //Translate the bone to the new end position
+    cgp::vec3 currentEnd = getEnd();
+    cgp::vec3 translation = end - currentEnd;
+    translate(translation);
 }
 void Bone::setStart(cgp::vec3 start)
 {
-    this->start = start;
-    direction = (end - start);
-    length = cgp::norm(direction);
-    direction = (end - start) / length;
+    //Translate the bone to the new start position
+    cgp::vec3 translation = start - frameAbsolut.position;
+    translate(translation);
 }
 
-void Bone::translate(cgp::vec3 translation)
+void Bone::fabricStepForward(cgp::vec3 target)
 {
-    this->start += translation;
-    this->end += translation;
+    cgp::vec3 oldDirection = getDirection();
+    cgp::vec3 end = getEnd();
+
+    //Translate the bone to the new start position
+    setStart(target);
+
+
+    cgp::vec3 newDirection = cgp::normalize(end - target);
+    cgp::rotation_transform rotation = cgp::rotation_transform::from_vector_transform(oldDirection, newDirection);
+    frameAbsolut = rotation * frameAbsolut;
 }
 
-void Bone::draw(environment_structure& environment, cgp::vec3 poseReference)
+void Bone::fabricStepBackward(cgp::vec3 target)
+{
+    cgp::vec3 oldDirection = getDirection();
+    cgp::vec3 newDirection = cgp::normalize(target - getStart());
+
+    cgp::rotation_transform rotation = cgp::rotation_transform::from_vector_transform(oldDirection, newDirection);
+    frameAbsolut = rotation * frameAbsolut;
+
+    setEnd(target);
+}
+
+void Bone::forwardConstraint()
+{
+    //on va faire en sorte que le bone soit bien placé par rapport à son parent
+    if (jointFather != nullptr) {
+        jointFather->applyConstraintOnChild();
+    }
+}
+void Bone::backWardConstraint()
+{
+    //on va faire en sorte que le bone soit bien placé par rapport à son enfant
+    if (jointChild != nullptr) {
+        jointChild->applyConstraintOnFather();
+    }
+}
+
+void Bone::draw(environment_structure& environment)
 {   
+    
+    // Draw the bone
+    cgp::vec3 start = getStart();
+    cgp::vec3 end = getEnd();
+
     if (cgp::norm(end - start) < 0.01f) {
         return;
     }
-    // Draw the bone
-    this->bone.vbo_position.update(numarray<cgp::vec3>{start + poseReference, end + poseReference});
-    cgp::draw(this->bone, environment);
+
+    bone.draw(environment, start, end, cgp::vec3(1.0f, 0.5f, 0.5f));
+    // Draw the frame of the bone
+    bone.drawFrame(environment, frameAbsolut);
 }
+
+
 
 void KinematicChain::initialize()
 {
@@ -53,7 +126,6 @@ void KinematicChain::initialize()
         std::cout << "Initializing bone " << bone->name << std::endl;
         bone->initialize();
     }
-    endEffectorPos = bones.back()->end;
 }
 
 void KinematicChain::addBone(Bone* bone)
@@ -89,14 +161,21 @@ void KinematicChain::draw(environment_structure& environment)
 {
     // Draw the bones and articulations
     for (auto& bone : bones) {
-        bone->draw(environment, position);
-        articulation.model.translation = bone->end + position;
+        bone->draw(environment);
+        articulation.model.translation = bone->getStart();
         cgp::draw(articulation, environment);
-        articulation.model.translation = bone->start + position;
+        articulation.model.translation = bone->getEnd();
         cgp::draw(articulation, environment);
 
         std::cout << "bone name : " << bone->name << std::endl;
         std::cout << "bone length : " << bone->length << std::endl;
+    }
+}
+
+void KinematicChain::translateBones(cgp::vec3 translation)
+{
+    for (auto& bone : bones) {
+        bone->translate(translation);
     }
 }
 
@@ -106,15 +185,13 @@ void KinematicChain::backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, 
     // This function will take to bones, the target position and the tolerance
     // It will try to move the end of the first bone to the target position 
     // and will not move the start of the second
-
     //on procède de facon itérative en parcourant bonesOrder
     
-    for (auto& bone : bonesOrder) {
-        float length = bone->length;
-        bone->setEnd(target);
-        vec3 tragetStart = bone->end - bone->direction * length;
-        bone->setStart(tragetStart);
-        target = bone->start;
+    for (auto it = bonesOrder.rbegin(); it != bonesOrder.rend(); ++it){
+        Bone* bone = *it;
+        bone->fabricStepBackward(target);
+        bone->backWardConstraint();
+        target = bone->getStart();
     }
 }
     
@@ -125,73 +202,31 @@ void KinematicChain::forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, f
     // This function will take to bones, the target position and the tolerance
     // It will try to move the end of the first bone to the target position 
     // and will not move the start of the second
-
     ////on procède de facon itérative en parcourant bonesOrder à l'envers
-    
-    for (auto it = bonesOrder.rbegin(); it != bonesOrder.rend(); ++it) {
-        Bone* bone = *it;
-        float length = bone->length;
-        bone->setStart(target);
-        vec3 targetEnd = bone->start + bone->direction * length;
-        bone->setEnd(targetEnd);
-        target = bone->end;
-
-        
-    }
-}
-void KinematicChain::backwardApplyConstraints(std::vector<Bone*> bonesOrder)
-{
-    // Implementation of the FABRIK algorithm
-    // This function recusively apply the constraints to the KinematicChain
-
-    //on procède de facon itérative en parcourant bonesOrder en évitant le dernier os qui n'a pas de joint parent
-
-    for (auto& bone : bonesOrder) {
-        if (bone->jointFather != nullptr) {
-            bone->jointFather->applyConstraintOnFather(skeleton);
-        }
+    for (auto& bone : bonesOrder){
+        bone->fabricStepForward(target);
+        bone->forwardConstraint();
+        target = bone->getEnd();
     }
 }
 
-void KinematicChain::forwardApplyConstraints(std::vector<Bone*> bonesOrder)
-{
-    // Implementation of the FABRIK algorithm
-    // This function recusively apply the constraints to the KinematicChain
-
-    //on procède de facon itérative en parcourant bonesOrder à l'envers
-
-    for (auto it = bonesOrder.rbegin(); it != bonesOrder.rend(); ++it) {
-        Bone* bone = *it;
-        if (bone->jointFather != nullptr) {
-            bone->jointFather->applyConstraintOnChild(skeleton);
-        }
-    }
-}
 
 void KinematicChain::fabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance, int max_iter){
     //std::cout << "coucou" << std::endl;
-    //fixedpoint est start du dernier os
-    cgp::vec3 fixedPoint = bonesOrder.back()->start;
+    //fixedpoint est start du premier os
+    cgp::vec3 fixedPoint = bonesOrder.front()->getStart();
     for (int i = 0; i < max_iter; i++) {
         //backward FABRIK
         backwardFabrik(bonesOrder, target, tolerance);
-        //constraint
-        backwardApplyConstraints(bonesOrder);
         //forward FABRIK
         forwardFabrik(bonesOrder, fixedPoint, tolerance);
-        //constraint
-        forwardApplyConstraints(bonesOrder);
     }
 }
 
 void KinematicChain::fabrik(vec3 target, float tolerance, int max_iter)
 {
-    //on applique fabrik déjà implémenté avec un vecteur de pointeur sur les bones mais dans l'ordre inverse
-    std::vector<Bone*> bonesOrder;
-    for (auto it = bones.rbegin(); it != bones.rend(); ++it) {
-        bonesOrder.push_back(*it);
-    }
-    fabrik(bonesOrder, target, tolerance, max_iter);
+    //on applique fabrik déjà implémenté avec un vecteur de pointeur sur les bones
+    fabrik(bones, target, tolerance, max_iter);
 }
 
 void KinematicChain::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, float tolerance, int max_iter)
@@ -199,11 +234,11 @@ void KinematicChain::fabrik(Bone* targetBone, Bone* fixedBone, vec3 target, floa
     //on va construire un vecteur de pointeur sur les bones pour les parcourir à l'endroit puis à l'envers
     
     std::vector<Bone*> bonesOrder;
-    Bone* currentBone = targetBone;
+    Bone* currentBone = fixedBone;
     bonesOrder.push_back(currentBone);
     //on remonte l'arbre jusqu'à targetBone
-    while (currentBone != nullptr && currentBone->name != fixedBone->name) {
-        currentBone = currentBone->jointFather->boneFather;
+    while (currentBone != nullptr && currentBone->name != targetBone->name) {
+        currentBone = currentBone->jointChild->boneChild;
         bonesOrder.push_back(currentBone);
     }
     
@@ -232,30 +267,23 @@ void KinematicChain::fabrik(std::string targetBoneName, std::string fixedBoneNam
     }
 }
 
+
 void KinematicChain::fabrikAscendingTree(std::vector<Bone*> bonesOrder, vec3 target, float tolerance, int max_iter)
 {
     //std::cout << "coucou" << std::endl;
-    //fixedpoint est end du premier os
-    cgp::vec3 fixedPoint = bonesOrder.front()->end;
+    //fixedpoint est end du dernier os
+    cgp::vec3 fixedPoint = bonesOrder.back()->getEnd();
     for (int i = 0; i < max_iter; i++) {
         //forward FABRIK
         forwardFabrik(bonesOrder, target, tolerance);
-        //constraint
-        forwardApplyConstraints(bonesOrder);
         //backward FABRIK
         backwardFabrik(bonesOrder, fixedPoint, tolerance);
-        //constraint
-        backwardApplyConstraints(bonesOrder);
     }
 }
 
 void KinematicChain::fabrikAscendingTree(vec3 target, float tolerance, int max_iter)
 {
-    std::vector<Bone*> bonesOrder;
-    for (auto it = bones.rbegin(); it != bones.rend(); ++it) {
-        bonesOrder.push_back(*it);
-    }
-    fabrikAscendingTree(bonesOrder, target, tolerance);
+    fabrikAscendingTree(bones, target, tolerance);
 }
 
 void KinematicChain::fabrikAscendingTree(std::string targetBoneName, std::string fixedBoneName, vec3 target, float tolerance, int max_iter)
@@ -284,11 +312,11 @@ void KinematicChain::fabrikAscendingTree(Bone* targetBone, Bone* fixedBone, vec3
     //on va construire un vecteur de pointeur sur les bones pour les parcourir à l'endroit puis à l'envers
     
     std::vector<Bone*> bonesOrder;
-    Bone* currentBone = fixedBone;
+    Bone* currentBone = targetBone;
     bonesOrder.push_back(currentBone);
     //on monte l'arbre jusqu'à targetBone
-    while (currentBone != nullptr && currentBone->name != targetBone->name) {
-        currentBone = currentBone->jointFather->boneFather;
+    while (currentBone != nullptr && currentBone->name != fixedBone->name) {
+        currentBone = currentBone->jointChild->boneChild;
         bonesOrder.push_back(currentBone);
     }
     
@@ -297,7 +325,7 @@ void KinematicChain::fabrikAscendingTree(Bone* targetBone, Bone* fixedBone, vec3
 }
 
 
-
+/*
 void KinematicChain::setEndEffectorWorldPos(cgp::vec3 target)
 {
     fabrik(target - position);
@@ -364,31 +392,9 @@ bool KinematicChain::translateFromEndEffectorToBone(std::string name, cgp::vec3 
     return true;
 }
 
-/*
-void KinematicChain::setBoneStartWorldPos(std::string name, cgp::vec3 target)
-{
-    //on translate la chaîne entre le end effector et le bone cible 
-    Bone* bone = getBone(name);
-    if (bone == nullptr) {
-        std::cerr << "Error: Bone not found" << std::endl;
-        return;
-    }
-    std::cout << "################################################################# "<< std::endl;
-    std::cout << "bone start : " << bone->start + position << std::endl;
-    std::cout << "target : " << target << std::endl;
 
-    cgp::vec3 translation = target - position - bone->start;
-    if(!translateFromEndEffectorToBone(name, translation)){
-        std::cerr << "Something went wrong" << std::endl;
-        return;
-    }
-    
-    //on récupère le end effector
-    Bone* endEffector = bones.back();
-    //on applique Fabrik pour remettre la fin de la chaine à sa position initiale
-    fabrik(endEffector, bone, endEffector->end - translation);
-}
-*/
+
+
 void KinematicChain::setBoneStartWorldPos(std::string name, cgp::vec3 target)
 {
     //on va appeler fabrikAscendingTree pour déplacer le la chaine cinématique
@@ -427,4 +433,4 @@ void KinematicChain::setStartEffector(cgp::vec3 target)
     //on met à jour la position de reference de la chaine cinématique
     position = target;
 }
-
+*/

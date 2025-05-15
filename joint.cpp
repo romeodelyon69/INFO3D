@@ -14,119 +14,112 @@ Joint::Joint(std::string name, Bone* boneFather, Bone* boneChild)
     boneChild->jointFather = this;
 }
 
-void Joint::applyConstraintOnChild(HumanSkeleton *skeleton)
+void Joint::applyConstraintOnChild()
 {
-    cgp::vec3 translation =  boneFather->end - boneChild->start;
+    cgp::vec3 translation =  boneFather->getEnd() - boneChild->getStart();
     boneChild->translate(translation);
+    if(cgp::norm(translation) > 0.01f)
+    {
+        std::cerr << "Error: Joint " << name << " is not working properly" << std::endl;
+    }
 
 }
-void Joint::applyConstraintOnFather(HumanSkeleton *skeleton)
+void Joint::applyConstraintOnFather()
 {
-    cgp::vec3 translation =  boneChild->start - boneFather->end;
+    cgp::vec3 translation =  boneChild->getStart() - boneFather->getEnd();
     boneFather->translate(translation);
+    if(cgp::norm(translation) > 0.01f)
+    {
+        std::cerr << "Error: Joint " << name << " is not working properly" << std::endl;
+    }
 }
 
-GeneralRotule::GeneralRotule(std::string name, Bone* boneFather, Bone* boneChild, vec3 axis, float maxAngle)
-    : Joint(name, boneFather, boneChild), axis(axis), maxAngle(maxAngle) {}
 
 
-void GeneralRotule::set(vec3 axis, float maxAngle)
-{
-    this->axis = axis;
-    this->maxAngle = maxAngle;
-}
-
-void GeneralRotule::applyConstraintOnChild(HumanSkeleton *skeleton)
+void ParentRotule::applyConstraintOnChild()
 {   
-    //We are going to move the child bone to verify the constraint 
-    cgp::vec3 translation =  boneFather->end - boneChild->start;
-   
-    if(cgp::norm(translation) > 0.01f){
-        std::cout << "translation child : AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH " << translation << std::endl;
-    }
-    //boneChild->translate(translation);
+    Joint::applyConstraintOnChild();
     
-    //get the position of the child bone 
+    cgp::vec3 axis = boneFather->getDirection();
+    cgp::vec3 direction = boneChild->getDirection();
+    float angle = angleBetween(direction, axis);
 
-    //get the angle between the child bone and the axis
-    float angle = angleBetween(boneChild->direction, axis);
-
-    //std::cout << "#########################################################################" << std::endl;
-    //std::cout << "Applying constraint for joint " << name << "angle is "<< angle<< std::endl;
-
-    //check if the angle is greater than the max angle
     if (angle > maxAngle) {
-        //std::cout << "Angle is greater than max angle and is " << angle << std::endl;
-       //rotate the child bone aroud the cross product of the child vector and the axis
-        vec3 rotationAxis = normalize(cross(boneChild->direction, axis));
-        //rotate the child bone
+        vec3 rotationAxis = normalize(cross(direction, axis));
         float angleToRotate = angle - maxAngle;
-        mat3 rotationMatrix = mat3::build_rotation_from_axis_angle(rotationAxis, angleToRotate);
-        vec3 newChildVector = boneChild->length * rotationMatrix * boneChild->direction;
-
-        boneChild->setEnd(boneChild->start + newChildVector);
-        //std::cout<<"le nouvel angle vaut : "<<angleBetween(newChildVector, axis) << std::endl;
+        cgp::rotation_transform rotationMatrix = cgp::rotation_transform::from_axis_angle(rotationAxis, angleToRotate);
+        boneChild->frameAbsolut = rotationMatrix * boneChild->frameAbsolut;
     }
 }
 
-void GeneralRotule::applyConstraintOnFather(HumanSkeleton *skeleton)
+void ParentRotule::applyConstraintOnFather()
 {
-    cgp::vec3 translation =  boneChild->start - boneFather->end;
-    //std::cout << "translation father : " << translation << std::endl;
-    //boneFather->translate(translation);
-    //get the angle between the father bone and the axis
-    float angle = angleBetween(boneChild->direction, axis);
+    Joint::applyConstraintOnFather();
 
-    //std::cout << "#########################################################################" << std::endl;
-    //std::cout << "Applying constraint for joint " << name << "angle is "<< angle<< std::endl;
+    cgp::vec3 axis = boneChild->getDirection();
+    cgp::vec3 direction = boneFather->getDirection();
+    float angle = angleBetween(direction, axis);
 
-    //check if the angle is greater than the max angle
     if (angle > maxAngle) {
-        //std::cout << "Angle is greater than max angle and is " << angle << std::endl;
-       //rotate the child bone aroud the cross product of the child vector and the axis
-        vec3 rotationAxis = normalize(cross(boneChild->direction, axis));
-        //rotate the father bone
-        //std::cout << "ancienne longueuer " << boneFather->length << std::endl;
-        float angleToRotate = maxAngle - angle;
-        mat3 rotationMatrix = mat3::build_rotation_from_axis_angle(rotationAxis, angleToRotate);
-        vec3 newFatherVector = boneFather->length * rotationMatrix * boneFather->direction;
-        //std::cout << "bone father direction norme " << cgp::norm(boneFather->direction) << std::endl;
-        //std::cout << "newFatherVector norme " << cgp::norm(newFatherVector) << std::endl;
-        
-        boneFather->setStart(boneFather->end - newFatherVector);
-        //std::cout << "nouvelle longueur" << boneFather->length << std::endl;
-        //std::cout<<"le nouvel angle vaut : "<<angleBetween(newChildVector, axis) << std::endl;
+        vec3 rotationAxis = normalize(cross(direction, axis));
+        float angleToRotate = angle - maxAngle;
+        cgp::rotation_transform rotationMatrix = cgp::rotation_transform::from_axis_angle(rotationAxis, angleToRotate);
+        boneFather->frameAbsolut = rotationMatrix * boneFather->frameAbsolut;
     }
 }
 
 
 ParentRotule::ParentRotule(std::string name, Bone* boneFather, Bone* boneChild, float maxAngle)
-    : GeneralRotule(name, boneFather, boneChild, normalize(boneFather->end - boneFather->start), maxAngle) {}
+    : Joint(name, boneFather, boneChild) // Explicitly call the Joint constructor
+{
+    this->maxAngle = maxAngle;
+}
 
 void ParentRotule::setAngle(float maxAngle)
 {
     this->maxAngle = maxAngle;
 }
 
-void ParentRotule::update(){
-    this-> axis = normalize(boneFather->end - boneFather->start);
+
+Hinge::Hinge(std::string name, Bone* boneFather, Bone* boneChild, float maxAngle)
+    : Joint(name, boneFather, boneChild) // Explicitly call the Joint constructor
+{
+    this->maxAngle = maxAngle;
+}
+void Hinge::setAngle(float maxAngle)
+{
+    this->maxAngle = maxAngle;
+}
+void Hinge::applyConstraintOnChild()
+{
+    Joint::applyConstraintOnChild();
+    
+    //on veut veut que (O,xfather, zFather)
+
+    cgp::vec3 xFather = boneFather->getX();
+    cgp::vec3 xChild = boneChild->getX();
+    cgp::vec3 zChild = boneChild->getZ();
+
+    cgp::rotation_transform rotation = cgp::rotation_transform::from_vector_transform(xChild, xFather);
+    //boneChild->frameAbsolut = rotation * boneChild->frameAbsolut;
 }
 
-void ParentRotule::applyConstraintOnChild(HumanSkeleton *skeleton)
+void Hinge::applyConstraintOnFather()
 {
-    //update the axis
-    this->update();
-    //apply the constraint
-    GeneralRotule::applyConstraintOnChild(skeleton);
+    Joint::applyConstraintOnFather();
+    
+    //on va faire matcher les axes x de boneFather et boneChild en faisant tourner boneFather autour de son axe z 
+    //ainsi l'os reste en position on le fait juste trouner
+
+    cgp::vec3 xFather = boneFather->getX();
+    cgp::vec3 xChild = boneChild->getX();
+    cgp::vec3 zFather = boneFather->getZ();
+
+    cgp::rotation_transform rotation = cgp::rotation_transform::from_vector_transform(xFather, xChild);
+    boneFather->frameAbsolut = rotation * boneFather->frameAbsolut;
 }
 
-void ParentRotule::applyConstraintOnFather(HumanSkeleton *skeleton)
-{
-    //update the axis
-    this->update();
-    //apply the constraint
-    GeneralRotule::applyConstraintOnFather(skeleton);
-}
+
 
 
 

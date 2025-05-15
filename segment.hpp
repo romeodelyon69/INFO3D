@@ -10,4 +10,5 @@ class Segment{
         Segment();
         void initialize();
         void draw(environment_structure& environment, cgp::vec3 a, cgp::vec3 b, cgp::vec3 color = cgp::vec3(1,1,1));
+        void drawFrame(environment_structure& environment, cgp::frame frame);
 };

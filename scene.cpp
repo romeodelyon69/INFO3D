@@ -72,10 +72,8 @@ void scene_structure::initialize()
 
 	// Initialize the arm
 	arm.initialize();
-	human.initialize();
+	//human.initialize();
 
-	std::cout << "arm origin = " << human.leftArm.position << std::endl;
-	std::cout << "leg origin = " << human.leftLeg.position << std::endl;
 
 
 }
@@ -131,15 +129,9 @@ void scene_structure::display_frame()
 	if (timer.t > 3.0f){
 		arm.setStartEffector(navelPos);
 	}*/
-	arm.setEndEffectorWorldPos(target);
-	if (timer.t > 3.0f){
-		arm.setStartEffector(navelPos);
-	}
-	if (timer.t > 8.0f){
-		arm.moveFromShoulderToHandWorldPos(shoulderPos);
-	}
+
+	arm.moveHand(target);
 	
-		
 	
 	
 	// Draw the human skeleton

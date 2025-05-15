@@ -4,6 +4,7 @@
 #include "stdlib.h"
 #include "joint.hpp"
 #include "environment.hpp"
+#include "segment.hpp"
 
 
 class Joint;
@@ -12,22 +13,16 @@ class HumanSkeleton;
 class Bone{
     public:
         std::string name;
-        cgp::vec3 start;
-        cgp::vec3 end;
-        cgp::vec3 direction;
-        
+        cgp::frame frameAbsolut;   //the frame of the bone, the bone is aligned with the z axis at the top of the bone
         float length;
+
         //constructor
-        Bone(std::string name, cgp::vec3 start, cgp::vec3 end): name(name), start(start), end(end){
-            direction = end - start;
-            length = cgp::norm(direction);
-            direction = (end - start) / length;
-        };
-        cgp::curve_drawable bone;
+        Bone(std::string name, cgp::frame frame, float length);
+
+        Segment bone;
 
         void initialize();
-
-        void draw(environment_structure& environment, cgp::vec3 poseReference = cgp::vec3(0,0,0));
+        void draw(environment_structure& environment);
         
         //pour le moment chaque os n'a qu'un seul parent direct et qu'un seul enfant direct (si il y en a un)
         Joint *jointFather = nullptr;
@@ -35,6 +30,22 @@ class Bone{
 
         void setStart(cgp::vec3 start);
         void setEnd(cgp::vec3 end);
+
+        cgp::vec3 getStart();
+        cgp::vec3 getEnd();
+        cgp::vec3 getDirection();
+        cgp::vec3 getX();
+        cgp::vec3 getY();
+        cgp::vec3 getZ();
+
+        void fabricStepForward(cgp::vec3 target);   //we move the start of the bone to the target position 
+                                                    //and we rotate the bone so the new uz match the direction of the end
+
+        void fabricStepBackward(cgp::vec3 target);  //we translate and then rotate so that the end of the bone is at the target position
+
+        void backWardConstraint();
+        void forwardConstraint();
+
         void translate(cgp::vec3 translation);
 };
 
@@ -51,9 +62,6 @@ class KinematicChain{
             joints.reserve(128);
         }
 
-        cgp::vec3 position; //the position of the kinematic chain in the world
-        cgp::vec3 endEffectorPos;
-
         HumanSkeleton *skeleton = nullptr;
         
         //a sphere to display the articulation
@@ -65,11 +73,13 @@ class KinematicChain{
         virtual void initialize();
 
         void draw(environment_structure& environment);
+        void translateBones(cgp::vec3 translation);
 
+        /*
         void setReferencePos(cgp::vec3 position);
         void translate(cgp::vec3 translation);
         bool translateFromEndEffectorToBone(std::string name, cgp::vec3 translation);
-        void translateBones(cgp::vec3 translation);
+        
 
         void setEndEffectorWorldPos(cgp::vec3 target);
         void setEndEffectorRelativePos(cgp::vec3 target);
@@ -79,6 +89,7 @@ class KinematicChain{
 
         void setBoneStartWorldPos(std::string name, cgp::vec3 target);
         void setBoneStartRelativePos(std::string name, cgp::vec3 target);
+        */
         
         Bone* getBone(std::string name);
         Joint* getJoint(std::string name);
@@ -99,7 +110,5 @@ class KinematicChain{
         //it will try to move the end of the first bone to the target position 
         //and will not move the start of the second
         void forwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
-        void forwardApplyConstraints(std::vector<Bone*> bonesOrder);
         void backwardFabrik(std::vector<Bone*> bonesOrder, vec3 target, float tolerance = 0.01f);
-        void backwardApplyConstraints(std::vector<Bone*> bonesOrder);
 };

@@ -17,31 +17,30 @@ class Joint{
         Bone *boneChild;
         //constructor
         Joint(std::string name, Bone* boneFather, Bone* boneChild);
-        virtual void applyConstraintOnFather(HumanSkeleton *skeleton);
-        virtual void applyConstraintOnChild(HumanSkeleton *skeleton);
+        virtual void applyConstraintOnFather();
+        virtual void applyConstraintOnChild();
 };
 
-class GeneralRotule : public Joint{
-    public:
-        vec3 axis;      //the axis of the cone of admission
-        float maxAngle; //the maximal angle of the cone of admission
 
-        // Constructor explicitly initializes the base class Joint
-        GeneralRotule(std::string name, Bone* boneFather, Bone* boneChild, vec3 axis, float maxAngle);
-
-        void set(vec3 axis, float maxAngle);
-        virtual void applyConstraintOnFather(HumanSkeleton *skeleton) override;
-        virtual void applyConstraintOnChild(HumanSkeleton *skeleton) override;
-};
-
-class ParentRotule : public GeneralRotule {
+class ParentRotule : public Joint {
     public:
         // Constructor 
         ParentRotule(std::string name, Bone* boneFather, Bone* boneChild, float maxAngle);
         
+        float maxAngle; //in radian
         void setAngle(float maxAngle);
-        void update();
-        void applyConstraintOnFather(HumanSkeleton *skeleton) override;
-        void applyConstraintOnChild(HumanSkeleton *skeleton) override;
+        void applyConstraintOnFather() override;
+        void applyConstraintOnChild() override;
+};
+
+class Hinge : public Joint {
+    public:
+        // Constructor 
+        Hinge(std::string name, Bone* boneFather, Bone* boneChild, float maxAngle);
+        
+        float maxAngle; //in radian
+        void setAngle(float maxAngle);
+        void applyConstraintOnFather() override;
+        void applyConstraintOnChild() override;
 };
 

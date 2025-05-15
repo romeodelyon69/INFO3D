@@ -129,7 +129,7 @@ src/joint.o: src/joint.cpp src/joint.hpp ../../cgp/library/cgp/cgp.hpp \
  ../../cgp/library/cgp/20_format_parser/mesh_loader/obj_advanced/obj_advanced.hpp \
  ../../cgp/library/cgp/21_scene_project_helper/scene_project_helper.hpp \
  ../../cgp/library/cgp/21_scene_project_helper/path/path.hpp \
- src/kinematicChain.hpp src/environment.hpp src/Nmath.hpp
+ src/kinematicChain.hpp src/environment.hpp src/segment.hpp src/Nmath.hpp
 
 src/joint.hpp:
 
@@ -398,5 +398,7 @@ src/joint.hpp:
 src/kinematicChain.hpp:
 
 src/environment.hpp:
+
+src/segment.hpp:
 
 src/Nmath.hpp:
