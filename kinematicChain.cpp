@@ -220,6 +220,10 @@ void KinematicChain::fabrik(std::vector<Bone*> bonesOrder, vec3 target, float to
         backwardFabrik(bonesOrder, target, tolerance);
         //forward FABRIK
         forwardFabrik(bonesOrder, fixedPoint, tolerance);
+        if (cgp::norm(bonesOrder.back()->getEnd() - target) < tolerance) {
+            std::cout << "FABRIK converged in " << i + 1<< " iterations" << std::endl;
+            return;
+        }
     }
 }
 
